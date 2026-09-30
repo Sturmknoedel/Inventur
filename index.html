@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="only light">
+<title>Sartorius Filter Inventur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:only light;
+  --gelb:#FFFF00;
+  --schwarz:#000;
+  --flaeche:#F2F2F2;
+  --weiss:#FFF;
+  --linie:#D6D6D6;
+  --leise:#5A5A5A;
+  --rot:#B3261E;
+  --font:"Barlow",Arial,Helvetica,sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --tabh:64px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:var(--font);
+  background:var(--flaeche);
+  color:var(--schwarz);
+  font-size:16px;
+  line-height:1.4;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;
+}
+button,input{font:inherit;color:inherit}
+
+/* Kopfzeile */
+.kopf{
+  position:sticky;top:0;z-index:10;
+  background:var(--schwarz);color:var(--weiss);
+  border-left:8px solid var(--gelb);
+  padding:calc(var(--safe-top) + 12px) 16px 12px 14px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+}
+.kopf h1{margin:0;font-family:var(--cond);font-size:22px;font-weight:700;line-height:1.05}
+.kopf .marke{display:block;font-family:var(--font);font-size:13px;font-weight:500;color:#BDBDBD}
+.kopf .summe{text-align:right;line-height:1}
+.kopf .summe b{display:block;font-family:var(--cond);font-size:28px;color:var(--gelb);white-space:nowrap}
+.kopf .summe small{font-size:13px;color:#BDBDBD}
+
+main{max-width:640px;margin:0 auto;padding:16px 16px calc(var(--tabh) + var(--safe-bottom) + 28px)}
+.ansicht{display:none}
+.ansicht.aktiv{display:block}
+h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line-height:1.1}
+
+/* Formularfelder */
+.feld{display:block;margin-bottom:14px}
+.feld > span{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.eingabe{
+  width:100%;height:54px;padding:0 14px;
+  border:2px solid var(--linie);border-radius:10px;background:var(--weiss);
+  font-size:18px;-webkit-appearance:none;appearance:none;
+}
+.eingabe:focus{outline:none;border-color:var(--schwarz);box-shadow:0 0 0 3px var(--gelb)}
+.eingabe.falsch{border-color:var(--rot)}
+.einheit{position:relative;display:block}
+.einheit::after{content:"m²";position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--leise);font-weight:600;pointer-events:none}
+.einheit .eingabe{padding-right:48px}
+.fehler{color:var(--rot);font-weight:600;font-size:14px;min-height:20px;margin:-4px 0 8px}
+
+/* Knöpfe */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-height:54px;padding:0 16px;
+  border:none;border-radius:10px;cursor:pointer;
+  font-weight:700;font-size:17px;
+}
+.btn:active{transform:scale(.98)}
+.btn-gelb{background:var(--gelb);color:var(--schwarz);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.btn-schwarz{background:var(--schwarz);color:var(--gelb)}
+.btn-hell{background:var(--weiss);color:var(--schwarz);border:2px solid var(--linie)}
+.btn-rot{background:var(--weiss);color:var(--rot);border:2px solid var(--rot)}
+.reihe{display:grid;gap:10px}
+.reihe-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+:focus-visible{outline:3px solid var(--schwarz);outline-offset:2px}
+
+/* Listen */
+.abschnitt{margin-top:28px}
+.abschnitt-titel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:700;font-size:15px;color:var(--leise);margin:0 4px 8px}
+.liste{background:var(--weiss);border:1px solid var(--linie);border-radius:12px;overflow:hidden}
+.zeile{
+  display:flex;align-items:center;gap:12px;width:100%;
+  min-height:62px;padding:12px 14px 12px 16px;
+  background:none;border:none;border-bottom:1px solid var(--linie);
+  text-align:left;cursor:pointer;
+}
+.zeile:last-child{border-bottom:none}
+.zeile:active{background:#FFFDB3}
+.zeile .haupt{flex:1;min-width:0}
+.zeile .titel{display:block;font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.zeile .unter{display:block;font-size:14px;color:var(--leise);overflow-wrap:anywhere}
+.zeile .wert{font-family:var(--cond);font-weight:700;font-size:21px;white-space:nowrap}
+.zeile .wert small{font-family:var(--font);font-size:13px;font-weight:600;color:var(--leise)}
+.pfeil{flex:none;width:10px;height:10px;margin-left:2px;border-top:2.5px solid var(--leise);border-right:2.5px solid var(--leise);transform:rotate(45deg)}
+.stift{flex:none;width:20px;height:20px;color:var(--leise)}
+
+/* Umschalter Typ / Charge */
+.umschalter{display:flex;background:var(--weiss);border:2px solid var(--schwarz);border-radius:12px;padding:3px;margin-bottom:12px}
+.umschalter button{flex:1;min-height:44px;border:none;background:none;border-radius:8px;font-weight:700;font-size:16px;cursor:pointer}
+.umschalter button[aria-pressed="true"]{background:var(--schwarz);color:var(--gelb)}
+.suchfeld{margin-bottom:14px}
+
+/* Detailansicht */
+.zurueck{
+  display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px 0 6px;margin:0 0 6px -6px;
+  background:none;border:none;border-radius:8px;font-weight:700;font-size:16px;cursor:pointer;
+}
+.zurueck::before{content:"";width:9px;height:9px;border-left:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(45deg);margin-left:6px}
+.gesamt{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  background:var(--gelb);border-radius:12px;padding:14px 16px;margin-bottom:20px;
+}
+.gesamt span{font-weight:600}
+.gesamt b{font-family:var(--cond);font-size:30px;line-height:1;white-space:nowrap}
+.gruppe{margin-bottom:20px}
+
+.leer{text-align:center;padding:36px 20px;color:var(--leise);background:var(--weiss);border:1px dashed var(--linie);border-radius:12px}
+.leer .btn{margin-top:14px}
+
+/* Übersicht: Kennzahlen + Blöcke */
+.kennzahlen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.kennzahl{background:var(--weiss);border:1px solid var(--linie);border-radius:10px;padding:10px 8px;text-align:center}
+.kennzahl b{display:block;font-family:var(--cond);font-size:26px;line-height:1.05}
+.kennzahl span{font-size:13px;color:var(--leise);font-weight:600}
+.block{background:var(--weiss);border-radius:12px;overflow:hidden;margin-bottom:14px;border:1px solid var(--linie)}
+.block-kopf{
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:12px 14px 12px 16px;min-height:60px;
+  background:var(--schwarz);color:var(--weiss);border:none;border-left:6px solid var(--gelb);
+  text-align:left;cursor:pointer;
+}
+.block-kopf .haupt{flex:1;min-width:0}
+.block-kopf .titel{display:block;font-weight:700;font-size:18px;overflow-wrap:anywhere}
+.block-kopf .unter{display:block;font-size:13px;color:#BDBDBD}
+.block-kopf .wert{font-family:var(--cond);font-weight:700;font-size:24px;color:var(--gelb);white-space:nowrap}
+.block-kopf .pfeil{border-color:var(--gelb)}
+.unterzeile{
+  display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:4px 12px;width:100%;
+  padding:10px 16px;min-height:48px;background:none;border:none;border-top:1px solid var(--linie);
+  text-align:left;cursor:pointer;
+}
+.unterzeile:first-child{border-top:none}
+.unterzeile:active{background:#FFFDB3}
+.unterzeile .name{font-weight:600;overflow-wrap:anywhere}
+.unterzeile .name small{display:block;font-size:13px;font-weight:500;color:var(--leise)}
+.unterzeile .menge{font-family:var(--cond);font-weight:700;font-size:20px;white-space:nowrap;text-align:right}
+.balken{grid-column:1 / -1;height:4px;background:var(--flaeche);border-radius:2px;overflow:hidden}
+.balken i{display:block;height:100%;background:var(--schwarz)}
+.sicherung{font-size:14px;color:var(--leise);margin:0 4px 10px}
+.versteckt{display:none}
+
+/* Scanner */
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn svg{width:22px;height:22px;flex:none}
+.scan-start{margin-bottom:10px}
+.oder{font-size:14px;color:var(--leise);text-align:center;margin:0 0 16px}
+.scanner{position:fixed;inset:0;z-index:50;background:#000;display:none;flex-direction:column}
+.scanner.offen{display:flex}
+.scan-kopf{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(var(--safe-top) + 6px) 6px 6px 14px;background:#000;color:#fff;border-left:8px solid var(--gelb)}
+.scan-kopf h2{margin:0;color:#fff;font-size:22px}
+.scan-knoepfe{display:flex;align-items:center;gap:4px}
+.scan-kn{min-width:48px;height:44px;padding:0 10px;border:2px solid #444;border-radius:10px;background:#1A1A1A;color:#fff;font-weight:700;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
+.scan-kn[aria-pressed="true"]{background:var(--gelb);color:#000;border-color:var(--gelb)}
+.scan-kn svg{width:20px;height:20px}
+.scan-kn[hidden]{display:none}
+.scan-rahmen{position:absolute;left:4%;right:4%;top:15%;bottom:24%;border:2px dashed rgba(255,255,255,.6);border-radius:14px;pointer-events:none}
+.scan-rahmen[hidden]{display:none}
+.scan-diag{position:absolute;left:8px;top:8px;right:8px;font-size:12px;line-height:1.3;color:#fff;background:rgba(0,0,0,.55);padding:4px 8px;border-radius:6px;pointer-events:none;overflow-wrap:anywhere}
+.scan-zu{width:48px;height:48px;border:none;background:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:10px}
+.scan-zu svg{width:26px;height:26px}
+.scan-bild{position:relative;flex:1;min-height:0;overflow:hidden;background:#111}
+.scan-bild video,.scan-bild canvas{position:absolute;inset:0;width:100%;height:100%}
+.scan-bild video{object-fit:cover}
+.scan-bild img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.scan-bild [hidden]{display:none}
+.scan-status{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:calc(100% - 24px);background:rgba(0,0,0,.75);color:#fff;padding:8px 14px;border-radius:999px;font-weight:600;font-size:15px;text-align:center}
+.scan-fertig{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s}
+.scan-fertig.zeigen{opacity:1}
+.scan-fertig span{width:112px;height:112px;border-radius:50%;background:#1E8E3E;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px rgba(30,142,62,.35)}
+.scan-fertig svg{width:64px;height:64px}
+.scan-panel{background:var(--flaeche);border-top:6px solid var(--gelb);padding:10px 14px calc(10px + var(--safe-bottom))}
+.scan-panel.komplett{border-top-color:#1E8E3E}
+.scan-feld{min-height:0;display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:12px;background:var(--weiss);border:1px solid var(--linie);border-radius:10px;padding:6px 10px 6px 12px;margin-bottom:6px}
+.scan-feld .lbl{font-size:13px;font-weight:600;color:var(--leise)}
+.scan-feld .val{font-family:var(--cond);font-size:21px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+.scan-feld .val.leer{font-family:var(--font);font-size:15px;font-weight:500;color:#8C8C8C}
+.status-icon{grid-row:1 / span 2;grid-column:2;width:34px;height:34px;border-radius:50%;border:2px solid var(--linie);color:transparent;display:flex;align-items:center;justify-content:center}
+.status-icon svg{width:20px;height:20px}
+.status-icon.pruefen{border-color:#B89A00;background:#FFF59A;color:#6B5A00}
+.status-icon.ok{border-color:#1E8E3E;background:#1E8E3E;color:#fff}
+.val-zeile{display:flex;align-items:baseline;gap:6px}
+.val-eingabe{flex:1;min-width:0;border:none;border-bottom:2px dashed var(--linie);background:none;padding:0;font-family:var(--cond);font-size:21px;font-weight:700;line-height:1.2}
+.val-eingabe::placeholder{font-family:var(--font);font-size:15px;font-weight:500;color:#8C8C8C}
+.val-eingabe:focus{outline:none;border-bottom-color:var(--schwarz)}
+.val-zeile small{font-weight:600;color:var(--leise)}
+.scan-rolle{font-size:14px;color:var(--leise);margin:0 2px 6px}
+.scan-rolle:empty{display:none}
+.scan-hinweis{font-size:14px;font-weight:600;color:#7A4F00;margin:2px 2px 6px;min-height:0}
+.scan-hinweis:empty{display:none}
+.scan-panel .btn{min-height:50px}
+.linkbtn{display:block;width:100%;margin-top:4px;min-height:40px;background:none;border:none;font-weight:600;text-decoration:underline;cursor:pointer}
+@media (max-height:680px){.scan-feld{padding:4px 10px}.scan-feld .val,.val-eingabe{font-size:19px}.status-icon{width:30px;height:30px}}
+
+/* Tab-Leiste */
+.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:var(--schwarz);display:flex;justify-content:center;
+  padding-bottom:var(--safe-bottom);
+}
+.tabs-innen{display:flex;width:100%;max-width:640px}
+.tab{
+  flex:1;height:var(--tabh);background:none;border:none;cursor:pointer;
+  border-top:4px solid transparent;color:#BDBDBD;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:13px;font-weight:600;
+}
+.tab svg{width:24px;height:24px}
+.tab[aria-current="page"]{color:var(--gelb);border-top-color:var(--gelb)}
+.tab:focus-visible{outline-color:var(--gelb);outline-offset:-4px}
+
+/* Bearbeiten-Fenster */
+.overlay{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}
+.overlay.offen{display:flex}
+.sheet{
+  width:100%;max-width:640px;max-height:92vh;overflow:auto;
+  background:var(--flaeche);border-radius:18px 18px 0 0;border-top:6px solid var(--gelb);
+  padding:18px 16px calc(18px + var(--safe-bottom));
+  animation:hoch .22s ease-out;
+}
+.sheet h2{margin-bottom:4px}
+.ziel-markiert{animation:blink 1.2s ease-out}
+@keyframes blink{0%{box-shadow:0 0 0 4px var(--gelb)}100%{box-shadow:0 0 0 4px transparent}}
+.sheet .info{font-size:14px;color:var(--leise);margin:0 0 16px}
+@keyframes hoch{from{transform:translateY(100%)}to{transform:none}}
+
+.toast{
+  position:fixed;left:50%;z-index:60;
+  bottom:calc(var(--tabh) + var(--safe-bottom) + 14px);
+  transform:translateX(-50%) translateY(8px);
+  width:max-content;max-width:calc(100% - 32px);
+  background:var(--schwarz);color:var(--gelb);font-weight:700;
+  padding:12px 18px;border-radius:10px;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+}
+.toast.zeigen{opacity:1;transform:translateX(-50%)}
+
+@media (prefers-reduced-motion:reduce){
+  .sheet{animation:none}
+  .toast{transition:none}
+}
+@media (min-width:700px){
+  main{padding-top:28px}
+  .overlay{align-items:center}
+  .sheet{border-radius:18px;max-height:86vh}
+}
+</style>
+</head>
+<body>
+
+<header class="kopf">
+  <h1><span class="marke">Sartorius</span>Filter Inventur</h1>
+  <div class="summe" aria-live="polite">
+    <b id="kopfSumme">0,000 m²</b>
+    <small id="kopfAnzahl">0 Positionen</small>
+  </div>
+</header>
+
+<main>
+
+  <!-- ERFASSEN -->
+  <section id="v-erfassen" class="ansicht aktiv" aria-labelledby="t-erfassen">
+    <h2 id="t-erfassen">Bestand erfassen</h2>
+
+    <button type="button" class="btn btn-schwarz scan-start" id="btnScannen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>
+      Etikett scannen
+    </button>
+    <p class="oder">oder von Hand eingeben</p>
+
+    <form id="formNeu" novalidate autocomplete="off">
+      <label class="feld">
+        <span>Filtertyp</span>
+        <input class="eingabe" id="typ" list="dlTypen" enterkeyhint="next" autocapitalize="characters">
+      </label>
+      <label class="feld">
+        <span>Charge</span>
+        <input class="eingabe" id="charge" list="dlChargen" enterkeyhint="next" autocapitalize="characters">
+      </label>
+      <label class="feld">
+        <span>Menge</span>
+        <span class="einheit">
+          <input class="eingabe" id="menge" inputmode="decimal" enterkeyhint="done" placeholder="0,000">
+        </span>
+      </label>
+      <p class="fehler" id="fehlerNeu" role="alert"></p>
+      <button type="submit" class="btn btn-gelb">Speichern</button>
+    </form>
+
+    <div class="abschnitt">
+      <div class="abschnitt-titel"><span>Zuletzt erfasst</span></div>
+      <div id="zuletzt"></div>
+    </div>
+  </section>
+
+  <!-- ÜBERSICHT -->
+  <section id="v-uebersicht" class="ansicht" aria-label="Übersicht">
+    <div id="uebersichtInhalt"></div>
+  </section>
+
+  <!-- ALLE POSITIONEN -->
+  <section id="v-alle" class="ansicht" aria-labelledby="t-alle">
+    <h2 id="t-alle">Alle Positionen</h2>
+    <input class="eingabe suchfeld" id="sucheAlle" type="search" placeholder="Typ oder Charge suchen" aria-label="Positionen durchsuchen">
+    <div id="alleListe"></div>
+
+    <div class="abschnitt" id="sichern">
+      <h2>Daten sichern</h2>
+      <p class="sicherung" id="letzteSicherung"></p>
+      <div class="reihe">
+        <button type="button" class="btn btn-schwarz" id="btnExport">Excel-Export (CSV)</button>
+        <button type="button" class="btn btn-gelb" id="btnJsonExport">Sicherung speichern (JSON)</button>
+        <button type="button" class="btn btn-hell" id="btnJsonImport">Sicherung laden (JSON)</button>
+        <input type="file" id="dateiImport" accept=".json,application/json" class="versteckt">
+      </div>
+      <p class="hinweis sicherung" style="margin-top:10px">Die CSV-Datei ist für die Auswertung in Excel. Die JSON-Sicherung enthält jede einzelne Position und lässt sich hier wieder laden.</p>
+    </div>
+    <div class="abschnitt">
+      <button type="button" class="btn btn-rot" id="btnAllesLoeschen">Alle Daten löschen</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs" aria-label="Hauptmenü">
+  <div class="tabs-innen">
+    <button class="tab" data-tab="erfassen" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Erfassen
+    </button>
+    <button class="tab" data-tab="uebersicht">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+      Übersicht
+    </button>
+    <button class="tab" data-tab="alle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+      Alle
+    </button>
+  </div>
+</nav>
+
+<!-- Bearbeiten -->
+<div class="overlay" id="overlay" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="t-bearbeiten">
+    <h2 id="t-bearbeiten">Eintrag bearbeiten</h2>
+    <p class="info" id="bearbeitenInfo"></p>
+    <form id="formEdit" novalidate autocomplete="off">
+      <label class="feld">
+        <span>Filtertyp</span>
+        <input class="eingabe" id="eTyp" list="dlTypen" enterkeyhint="next" autocapitalize="characters">
+      </label>
+      <label class="feld">
+        <span>Charge</span>
+        <input class="eingabe" id="eCharge" list="dlChargen" enterkeyhint="next" autocapitalize="characters">
+      </label>
+      <label class="feld">
+        <span>Menge</span>
+        <span class="einheit">
+          <input class="eingabe" id="eMenge" inputmode="decimal" enterkeyhint="done">
+        </span>
+      </label>
+      <p class="fehler" id="fehlerEdit" role="alert"></p>
+      <div class="reihe">
+        <button type="submit" class="btn btn-gelb">Änderungen speichern</button>
+        <div class="reihe-2">
+          <button type="button" class="btn btn-hell" id="btnAbbrechen">Abbrechen</button>
+          <button type="button" class="btn btn-rot" id="btnLoeschen">Löschen</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="overlayImport" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="t-import">
+    <h2 id="t-import">Sicherung laden</h2>
+    <p class="info" id="importInfo"></p>
+    <div class="reihe">
+      <button type="button" class="btn btn-gelb" id="btnImportErsetzen">Aktuelle Daten ersetzen</button>
+      <button type="button" class="btn btn-schwarz" id="btnImportHinzu">Zu aktuellen Daten hinzufügen</button>
+      <button type="button" class="btn btn-hell" id="btnImportAbbrechen">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scanner -->
+<div class="scanner" id="scanner" role="dialog" aria-modal="true" aria-labelledby="t-scanner">
+  <div class="scan-kopf">
+    <h2 id="t-scanner">Scannen</h2>
+    <div class="scan-knoepfe">
+      <button type="button" class="scan-kn" id="btnZoom" hidden aria-label="Zoom ändern">1×</button>
+      <button type="button" class="scan-kn" id="btnLicht" hidden aria-pressed="false" aria-label="Licht">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+      </button>
+      <button type="button" class="scan-kn" id="btnKamera" hidden aria-label="Andere Kamera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/><path d="M14.5 8.8v2.4h-2.4M9.5 17.2v-2.4h2.4"/></svg>
+      </button>
+    <button type="button" class="scan-zu" id="btnScanZu" aria-label="Scanner schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    </div>
+  </div>
+  <div class="scan-bild">
+    <video id="scanVideo" playsinline muted autoplay></video>
+    <img id="scanFoto" alt="Aufgenommenes Etikett" hidden>
+    <div class="scan-rahmen" id="scanRahmen" aria-hidden="true"></div>
+    <canvas id="scanOverlay" aria-hidden="true"></canvas>
+    <div class="scan-fertig" id="scanFertig" aria-hidden="true"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+    <div class="scan-status" id="scanStatus" aria-live="polite"></div>
+    <div class="scan-diag" id="scanDiag" aria-hidden="true"></div>
+  </div>
+  <div class="scan-panel" id="scanPanel">
+    <div class="scan-feld">
+      <span class="lbl">Materialnummer</span>
+      <span class="status-icon" id="iconMaterial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      <span class="val-zeile"><input class="val-eingabe" id="scanMaterial" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="sucht …" aria-label="Materialnummer"></span>
+    </div>
+    <div class="scan-feld">
+      <span class="lbl">Charge</span>
+      <span class="status-icon" id="iconCharge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      <span class="val-zeile"><input class="val-eingabe" id="scanCharge" inputmode="numeric" autocomplete="off" placeholder="sucht …" aria-label="Charge"></span>
+    </div>
+    <div class="scan-feld">
+      <label class="lbl" for="scanFlaeche">Fläche</label>
+      <span class="status-icon" id="iconFlaeche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      <span class="val-zeile"><input class="val-eingabe" id="scanFlaeche" inputmode="decimal" autocomplete="off" placeholder="wird gelesen …"><small>m²</small></span>
+    </div>
+    <p class="scan-rolle" id="scanRolle"></p>
+    <p class="scan-hinweis" id="scanHinweis"></p>
+    <div class="reihe-2">
+      <button type="button" class="btn btn-hell" id="btnScanNeu">Neu scannen</button>
+      <button type="button" class="btn btn-gelb" id="btnScanSpeichern" disabled>Speichern</button>
+    </div>
+    <button type="button" class="linkbtn" id="btnScanFormular">Im Formular bearbeiten</button>
+  </div>
+</div>
+
+<input type="file" id="fotoKamera" accept="image/*" capture="environment" class="versteckt">
+
+<datalist id="dlTypen"></datalist>
+<datalist id="dlChargen"></datalist>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- Daten ---------- */
+const KEY = "inventur";
+
+function neueId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+let inventur = [];
+try { inventur = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ inventur = []; }
+
+/* Alte Einträge (ohne ID) übernehmen */
+let migriert = false;
+inventur = inventur.map(e => {
+  if (e && e.id) return e;
+  migriert = true;
+  return { id: neueId(), typ: String(e.typ || "").trim(), charge: String(e.charge || "").trim(), menge: Number(e.menge) || 0, zeit: 0 };
+});
+
+function speichern(){
+  try { localStorage.setItem(KEY, JSON.stringify(inventur)); }
+  catch(e){ toast("Speichern auf dem Gerät fehlgeschlagen"); }
+}
+if (migriert) speichern();
+
+/* ---------- Helfer ---------- */
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const schluessel = s => String(s).trim().toLowerCase();
+const sortiere = (a, b) => a.label.localeCompare(b.label, "de", { numeric: true, sensitivity: "base" });
+const summe = liste => liste.reduce((s, e) => s + e.menge, 0);
+const plural = (n, eins, viele) => n + " " + (n === 1 ? eins : viele);
+
+function parseMenge(text){
+  const s = String(text).trim().replace(/\s/g, "").replace(",", ".");
+  if (!s || !/^\d*\.?\d*$/.test(s) || s === ".") return NaN;
+  return parseFloat(s);
+}
+
+function zeitText(t){
+  if (!t) return "";
+  return new Date(t).toLocaleString("de-DE", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) + " Uhr";
+}
+
+/* Gruppiert nach Feld, Groß-/Kleinschreibung egal */
+function gruppiere(liste, feld){
+  const map = new Map();
+  liste.forEach(e => {
+    const k = schluessel(e[feld]);
+    if (!map.has(k)) map.set(k, { key: k, label: e[feld], eintraege: [] });
+    map.get(k).eintraege.push(e);
+  });
+  return [...map.values()].sort(sortiere);
+}
+
+let toastTimer;
+function toast(text){
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("zeigen");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("zeigen"), 2200);
+}
+
+const stiftSvg = '<svg class="stift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+
+function eintragZeile(e, variante){
+  let titel, unter;
+  if (variante === "voll"){
+    titel = esc(e.typ);
+    unter = "Charge " + esc(e.charge) + (e.rolle ? ", Rolle " + esc(e.rolle) : "") + (e.zeit ? ", " + zeitText(e.zeit) : "");
+  } else {
+    titel = fmt(e.menge) + " m²";
+    unter = (e.rolle ? "Rolle " + esc(e.rolle) + ", " : "") + (e.zeit ? "erfasst " + zeitText(e.zeit) : "ohne Zeitangabe");
+    unter = unter.charAt(0).toUpperCase() + unter.slice(1);
+  }
+  const wert = variante === "voll" ? `<span class="wert">${fmt(e.menge)} <small>m²</small></span>` : "";
+  return `<button class="zeile" data-edit="${e.id}" aria-label="Bearbeiten: ${esc(e.typ)}, Charge ${esc(e.charge)}, ${fmt(e.menge)} m²">
+    <span class="haupt"><span class="titel">${titel}</span><span class="unter">${unter}</span></span>
+    ${wert}${stiftSvg}
+  </button>`;
+}
+
+/* ---------- Zustand ---------- */
+let aktiverTab = "erfassen";
+let modus = "typ";          // "typ" oder "charge"
+let detailKey = null;       // geöffnete Gruppe in der Übersicht
+let sucheUebersicht = "";
+let bearbeitenId = null;
+
+/* ---------- Rendern ---------- */
+function renderAlles(){
+  renderKopf();
+  renderDatalists();
+  renderZuletzt();
+  renderUebersicht();
+  renderAlle();
+  renderSicherung();
+}
+
+function renderKopf(){
+  $("kopfSumme").textContent = fmt(summe(inventur)) + " m²";
+  $("kopfAnzahl").textContent = plural(inventur.length, "Position", "Positionen");
+}
+
+function renderDatalists(){
+  const opt = arr => arr.map(g => `<option value="${esc(g.label)}">`).join("");
+  $("dlTypen").innerHTML = opt(gruppiere(inventur, "typ"));
+  $("dlChargen").innerHTML = opt(gruppiere(inventur, "charge"));
+}
+
+function neuesteZuerst(liste){
+  return [...liste].sort((a, b) => (b.zeit || 0) - (a.zeit || 0));
+}
+
+function renderZuletzt(){
+  const letzte = neuesteZuerst(inventur).slice(0, 5);
+  $("zuletzt").innerHTML = letzte.length
+    ? `<div class="liste">${letzte.map(e => eintragZeile(e, "voll")).join("")}</div>`
+    : `<div class="leer">Noch nichts erfasst. Dein erster Eintrag erscheint hier.</div>`;
+}
+
+function renderUebersicht(){
+  const box = $("uebersichtInhalt");
+
+  if (!inventur.length){
+    box.innerHTML = `<h2>Übersicht</h2>
+      <div class="leer">Noch keine Positionen vorhanden.
+        <button class="btn btn-gelb" data-tab-link="erfassen">Ersten Bestand erfassen</button>
+      </div>`;
+    return;
+  }
+
+  const gruppen = gruppiere(inventur, modus);
+
+  /* Detailansicht einer Gruppe */
+  if (detailKey !== null){
+    const g = gruppen.find(x => x.key === detailKey);
+    if (g){ box.innerHTML = detailHtml(g); return; }
+    detailKey = null;
+  }
+
+  /* Alle Gruppen auf einen Blick, Unterteilung direkt sichtbar */
+  const q = schluessel(sucheUebersicht);
+  const unterFeld = modus === "typ" ? "charge" : "typ";
+  const bloecke = [];
+
+  gruppen.forEach(g => {
+    const kopfTreffer = !q || schluessel(g.label).includes(q);
+    let unter = gruppiere(g.eintraege, unterFeld);
+    if (!kopfTreffer) unter = unter.filter(u => schluessel(u.label).includes(q));
+    if (!unter.length) return;
+    bloecke.push({ g, unter });
+  });
+
+  const alleChargen = gruppiere(inventur, "charge").length;
+  const alleTypen = gruppiere(inventur, "typ").length;
+
+  const html = bloecke.map(({ g, unter }) => {
+    const gesamt = summe(g.eintraege);
+    const alleUnter = gruppiere(g.eintraege, unterFeld).length;
+    const unterText = modus === "typ"
+      ? plural(alleUnter, "Charge", "Chargen") + ", " + plural(g.eintraege.length, "Position", "Positionen")
+      : plural(alleUnter, "Filtertyp", "Filtertypen") + ", " + plural(g.eintraege.length, "Position", "Positionen");
+    const zeilen = unter.map(u => {
+      const m = summe(u.eintraege);
+      const anteil = gesamt > 0 ? Math.max(2, Math.round(m / gesamt * 100)) : 0;
+      return `<button class="unterzeile" data-detail="${esc(g.key)}" data-anker="${esc(u.key)}">
+        <span class="name">${unterFeld === "charge" ? "Charge " : ""}${esc(u.label)}<small>${plural(u.eintraege.length, "Position", "Positionen")}</small></span>
+        <span class="menge">${fmt(m)} m²</span>
+        <span class="balken" aria-hidden="true"><i style="width:${anteil}%"></i></span>
+      </button>`;
+    }).join("");
+    return `<div class="block">
+      <button class="block-kopf" data-detail="${esc(g.key)}">
+        <span class="haupt"><span class="titel">${modus === "charge" ? "Charge " : ""}${esc(g.label)}</span><span class="unter">${unterText}</span></span>
+        <span class="wert">${fmt(gesamt)} m²</span>
+        <span class="pfeil" aria-hidden="true"></span>
+      </button>
+      <div>${zeilen}</div>
+    </div>`;
+  }).join("");
+
+  box.innerHTML = `
+    <h2>Übersicht</h2>
+    <div class="kennzahlen">
+      <div class="kennzahl"><b>${alleTypen}</b><span>${alleTypen === 1 ? "Filtertyp" : "Filtertypen"}</span></div>
+      <div class="kennzahl"><b>${alleChargen}</b><span>${alleChargen === 1 ? "Charge" : "Chargen"}</span></div>
+      <div class="kennzahl"><b>${inventur.length}</b><span>${inventur.length === 1 ? "Position" : "Positionen"}</span></div>
+    </div>
+    <div class="umschalter" role="group" aria-label="Sortieren nach">
+      <button type="button" data-modus="typ" aria-pressed="${modus === "typ"}">Nach Filtertyp</button>
+      <button type="button" data-modus="charge" aria-pressed="${modus === "charge"}">Nach Charge</button>
+    </div>
+    <input class="eingabe suchfeld" id="sucheUebersicht" type="search" placeholder="Filtertyp oder Charge suchen" aria-label="Übersicht durchsuchen" value="${esc(sucheUebersicht)}">
+    ${html || `<div class="leer">Keine Treffer für „${esc(sucheUebersicht)}“.</div>`}
+  `;
+}
+
+function detailHtml(g){
+  const unterFeld = modus === "typ" ? "charge" : "typ";
+  const unterGruppen = gruppiere(g.eintraege, unterFeld);
+  const titel = modus === "typ" ? esc(g.label) : "Charge " + esc(g.label);
+
+  const bloecke = unterGruppen.map(u => {
+    const kopf = unterFeld === "charge" ? "Charge " + esc(u.label) : esc(u.label);
+    return `<div class="gruppe" data-ziel="${esc(u.key)}">
+      <div class="abschnitt-titel"><span>${kopf}</span><span>${fmt(summe(u.eintraege))} m²</span></div>
+      <div class="liste">${neuesteZuerst(u.eintraege).map(e => eintragZeile(e, "kurz")).join("")}</div>
+    </div>`;
+  }).join("");
+
+  return `
+    <button class="zurueck" data-zurueck>Übersicht</button>
+    <h2>${titel}</h2>
+    <div class="gesamt">
+      <span>Gesamt, ${plural(unterGruppen.length, unterFeld === "charge" ? "Charge" : "Filtertyp", unterFeld === "charge" ? "Chargen" : "Filtertypen")}</span>
+      <b>${fmt(summe(g.eintraege))} m²</b>
+    </div>
+    ${bloecke}
+  `;
+}
+
+function renderAlle(){
+  const q = schluessel($("sucheAlle").value);
+  const liste = neuesteZuerst(inventur).filter(e =>
+    !q || schluessel(e.typ).includes(q) || schluessel(e.charge).includes(q)
+  );
+  $("alleListe").innerHTML = liste.length
+    ? `<div class="liste">${liste.map(e => eintragZeile(e, "voll")).join("")}</div>`
+    : `<div class="leer">${inventur.length ? "Keine Treffer." : "Noch keine Positionen vorhanden."}</div>`;
+}
+
+/* ---------- Tabs ---------- */
+function zeigeTab(name){
+  aktiverTab = name;
+  document.querySelectorAll(".ansicht").forEach(s => s.classList.toggle("aktiv", s.id === "v-" + name));
+  document.querySelectorAll(".tab").forEach(t => {
+    if (t.dataset.tab === name) t.setAttribute("aria-current", "page");
+    else t.removeAttribute("aria-current");
+  });
+  window.scrollTo(0, 0);
+}
+
+/* ---------- Neu erfassen ---------- */
+function pruefe(typEl, chargeEl, mengeEl, fehlerEl, ohneId){
+  const typ = typEl.value.trim();
+  const charge = chargeEl.value.trim();
+  const menge = parseMenge(mengeEl.value);
+  [typEl, chargeEl, mengeEl].forEach(el => el.classList.remove("falsch"));
+
+  let fehler = "";
+  if (!typ){ typEl.classList.add("falsch"); fehler = "Filtertyp fehlt."; }
+  else if (!charge){ chargeEl.classList.add("falsch"); fehler = "Charge fehlt."; }
+  else if (isNaN(menge)){ mengeEl.classList.add("falsch"); fehler = "Menge als Zahl eingeben, z. B. 12,5"; }
+
+  fehlerEl.textContent = fehler;
+  if (fehler){
+    const el = fehler.startsWith("Filtertyp") ? typEl : fehler.startsWith("Charge") ? chargeEl : mengeEl;
+    el.focus();
+    return null;
+  }
+  /* Schreibweise an bestehende Einträge angleichen */
+  /* (der gerade bearbeitete Eintrag zählt nicht als Vorlage) */
+  const andere = inventur.filter(e => e.id !== ohneId);
+  const vorhandenTyp = andere.find(e => schluessel(e.typ) === schluessel(typ));
+  const vorhandenCharge = andere.find(e => schluessel(e.charge) === schluessel(charge));
+  return {
+    typ: vorhandenTyp ? vorhandenTyp.typ : typ,
+    charge: vorhandenCharge ? vorhandenCharge.charge : charge,
+    menge
+  };
+}
+
+$("formNeu").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const daten = pruefe($("typ"), $("charge"), $("menge"), $("fehlerNeu"));
+  if (!daten) return;
+
+  inventur.push({ id: neueId(), ...daten, zeit: Date.now() });
+  speichern();
+
+  /* Filtertyp bleibt stehen, damit mehrere Chargen schnell hintereinander gehen */
+  $("charge").value = "";
+  $("menge").value = "";
+  $("charge").focus();
+
+  renderAlles();
+  toast("Gespeichert: " + fmt(daten.menge) + " m², Charge " + daten.charge);
+});
+
+/* Enter springt ins nächste Feld */
+function weiterMitEnter(von, nach){
+  $(von).addEventListener("keydown", ev => {
+    if (ev.key === "Enter"){ ev.preventDefault(); $(nach).focus(); }
+  });
+}
+weiterMitEnter("typ", "charge");
+weiterMitEnter("charge", "menge");
+weiterMitEnter("eTyp", "eCharge");
+weiterMitEnter("eCharge", "eMenge");
+
+/* ---------- Bearbeiten ---------- */
+function oeffneBearbeiten(id){
+  const e = inventur.find(x => x.id === id);
+  if (!e) return;
+  bearbeitenId = id;
+  $("eTyp").value = e.typ;
+  $("eCharge").value = e.charge;
+  $("eMenge").value = fmt(e.menge);
+  $("fehlerEdit").textContent = "";
+  ["eTyp", "eCharge", "eMenge"].forEach(i => $(i).classList.remove("falsch"));
+  $("bearbeitenInfo").textContent = e.zeit ? "Erfasst am " + zeitText(e.zeit) : "";
+  $("overlay").classList.add("offen");
+  $("overlay").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => $("eMenge").focus({ preventScroll: true }), 50);
+}
+
+function schliesseBearbeiten(){
+  bearbeitenId = null;
+  $("overlay").classList.remove("offen");
+  $("overlay").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+}
+
+$("formEdit").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const e = inventur.find(x => x.id === bearbeitenId);
+  if (!e) return schliesseBearbeiten();
+
+  const daten = pruefe($("eTyp"), $("eCharge"), $("eMenge"), $("fehlerEdit"), e.id);
+  if (!daten) return;
+
+  e.typ = daten.typ;
+  e.charge = daten.charge;
+  e.menge = daten.menge;
+  speichern();
+  schliesseBearbeiten();
+  renderAlles();
+  toast("Änderungen gespeichert");
+});
+
+$("btnLoeschen").addEventListener("click", () => {
+  const e = inventur.find(x => x.id === bearbeitenId);
+  if (!e) return schliesseBearbeiten();
+  if (!confirm(`Eintrag löschen?\n${e.typ}, Charge ${e.charge}, ${fmt(e.menge)} m²`)) return;
+  inventur = inventur.filter(x => x.id !== bearbeitenId);
+  speichern();
+  schliesseBearbeiten();
+  renderAlles();
+  toast("Eintrag gelöscht");
+});
+
+$("btnAbbrechen").addEventListener("click", schliesseBearbeiten);
+$("overlay").addEventListener("click", ev => { if (ev.target.id === "overlay") schliesseBearbeiten(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && bearbeitenId) schliesseBearbeiten(); });
+
+/* ---------- Klicks (Delegation) ---------- */
+document.addEventListener("click", ev => {
+  const edit = ev.target.closest("[data-edit]");
+  if (edit){ oeffneBearbeiten(edit.dataset.edit); return; }
+
+  const tab = ev.target.closest("[data-tab]");
+  if (tab){ zeigeTab(tab.dataset.tab); return; }
+
+  const tabLink = ev.target.closest("[data-tab-link]");
+  if (tabLink){ zeigeTab(tabLink.dataset.tabLink); $("typ").focus(); return; }
+
+  const detail = ev.target.closest("[data-detail]");
+  if (detail){
+    detailKey = detail.dataset.detail;
+    renderUebersicht();
+    window.scrollTo(0, 0);
+    const anker = detail.dataset.anker;
+    if (anker){
+      const ziel = [...document.querySelectorAll("[data-ziel]")].find(el => el.dataset.ziel === anker);
+      if (ziel){
+        const oben = ziel.getBoundingClientRect().top + window.scrollY - document.querySelector(".kopf").offsetHeight - 12;
+        window.scrollTo(0, oben);
+        const liste = ziel.querySelector(".liste");
+        liste.classList.add("ziel-markiert");
+        setTimeout(() => liste.classList.remove("ziel-markiert"), 1300);
+      }
+    }
+    return;
+  }
+
+  if (ev.target.closest("[data-zurueck]")){ detailKey = null; renderUebersicht(); window.scrollTo(0, 0); return; }
+
+  const m = ev.target.closest("[data-modus]");
+  if (m){ modus = m.dataset.modus; detailKey = null; sucheUebersicht = ""; renderUebersicht(); return; }
+});
+
+document.addEventListener("input", ev => {
+  if (ev.target.id === "sucheUebersicht"){
+    sucheUebersicht = ev.target.value;
+    const pos = ev.target.selectionStart;
+    renderUebersicht();
+    const neu = $("sucheUebersicht");
+    neu.focus();
+    try { neu.setSelectionRange(pos, pos); } catch(e){}
+  }
+  if (ev.target.id === "sucheAlle") renderAlle();
+});
+
+/* ---------- Export, Sicherung, Import ---------- */
+const KEY_SICHERUNG = "inventur_letzteSicherung";
+
+function datumKurz(){
+  const d = new Date();
+  const z = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}`;
+}
+
+function herunterladen(inhalt, dateiname, typ){
+  const blob = new Blob([inhalt], { type: typ });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = dateiname;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function renderSicherung(){
+  let t = 0;
+  try { t = Number(localStorage.getItem(KEY_SICHERUNG)) || 0; } catch(e){}
+  $("letzteSicherung").textContent = t
+    ? "Letzte JSON-Sicherung: " + new Date(t).toLocaleString("de-DE", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) + " Uhr"
+    : "Noch keine JSON-Sicherung auf diesem Gerät gespeichert.";
+}
+
+$("btnExport").addEventListener("click", () => {
+  if (!inventur.length){ toast("Keine Daten zum Exportieren"); return; }
+  const zahl = n => n.toFixed(3).replace(".", ",");
+  const zelle = s => /[;"\n]/.test(s) ? '"' + String(s).replace(/"/g, '""') + '"' : s;
+
+  let csv = "FILTERTYP;CHARGE;POSITIONEN;MENGE (m²)\n";
+  gruppiere(inventur, "typ").forEach(g => {
+    gruppiere(g.eintraege, "charge").forEach(c => {
+      csv += [zelle(g.label), zelle(c.label), c.eintraege.length, zahl(summe(c.eintraege))].join(";") + "\n";
+    });
+    csv += ["GESAMT " + zelle(g.label), "", g.eintraege.length, zahl(summe(g.eintraege))].join(";") + "\n\n";
+  });
+  csv += ["GESAMT ALLE", "", inventur.length, zahl(summe(inventur))].join(";") + "\n";
+
+  herunterladen("\uFEFF" + csv, `inventur_${datumKurz()}.csv`, "text/csv;charset=utf-8;");
+  toast("CSV exportiert");
+});
+
+$("btnJsonExport").addEventListener("click", () => {
+  if (!inventur.length){ toast("Keine Daten zum Sichern"); return; }
+  const daten = {
+    app: "sartorius-filter-inventur",
+    version: 1,
+    exportiert: new Date().toISOString(),
+    anzahl: inventur.length,
+    positionen: inventur
+  };
+  herunterladen(JSON.stringify(daten, null, 2), `inventur_sicherung_${datumKurz()}.json`, "application/json");
+  try { localStorage.setItem(KEY_SICHERUNG, String(Date.now())); } catch(e){}
+  renderSicherung();
+  toast("Sicherung gespeichert");
+});
+
+let importPositionen = null;
+
+function pruefeImport(roh){
+  const liste = Array.isArray(roh) ? roh : (roh && Array.isArray(roh.positionen) ? roh.positionen : null);
+  if (!liste) throw new Error("Die Datei enthält keine Inventurdaten.");
+  const ok = [];
+  let uebersprungen = 0;
+  liste.forEach(e => {
+    const typ = e && String(e.typ ?? "").trim();
+    const charge = e && String(e.charge ?? "").trim();
+    const menge = e ? (typeof e.menge === "number" ? e.menge : parseMenge(e.menge)) : NaN;
+    if (!typ || !charge || !isFinite(menge)){ uebersprungen++; return; }
+    const pos = { id: e.id ? String(e.id) : neueId(), typ, charge, menge, zeit: Number(e.zeit) || 0 };
+    if (e.rolle) pos.rolle = String(e.rolle);
+    ok.push(pos);
+  });
+  if (!ok.length) throw new Error("In der Datei wurden keine gültigen Positionen gefunden.");
+  return { ok, uebersprungen };
+}
+
+$("btnJsonImport").addEventListener("click", () => $("dateiImport").click());
+
+$("dateiImport").addEventListener("change", async ev => {
+  const datei = ev.target.files[0];
+  ev.target.value = "";
+  if (!datei) return;
+  let ergebnis;
+  try {
+    ergebnis = pruefeImport(JSON.parse(await datei.text()));
+  } catch(e){
+    alert("Import nicht möglich: " + (e instanceof SyntaxError ? "Die Datei ist keine gültige JSON-Datei." : e.message));
+    return;
+  }
+  importPositionen = ergebnis.ok;
+  const hinweisFehler = ergebnis.uebersprungen ? ` ${plural(ergebnis.uebersprungen, "fehlerhafte Zeile wird", "fehlerhafte Zeilen werden")} übersprungen.` : "";
+
+  if (!inventur.length){
+    importAusfuehren("ersetzen");
+    return;
+  }
+  $("importInfo").textContent =
+    `Die Datei enthält ${plural(importPositionen.length, "Position", "Positionen")} mit ${fmt(summe(importPositionen))} m². ` +
+    `Auf diesem Gerät sind gerade ${plural(inventur.length, "Position", "Positionen")} gespeichert.` + hinweisFehler;
+  $("overlayImport").classList.add("offen");
+  $("overlayImport").setAttribute("aria-hidden", "false");
+});
+
+function schliesseImport(){
+  $("overlayImport").classList.remove("offen");
+  $("overlayImport").setAttribute("aria-hidden", "true");
+}
+
+function importAusfuehren(art){
+  if (!importPositionen) return;
+  let neu = 0;
+  if (art === "ersetzen"){
+    inventur = importPositionen;
+    neu = importPositionen.length;
+  } else {
+    const ids = new Set(inventur.map(e => e.id));
+    importPositionen.forEach(e => { if (!ids.has(e.id)){ inventur.push(e); neu++; } });
+  }
+  importPositionen = null;
+  detailKey = null;
+  speichern();
+  schliesseImport();
+  renderAlles();
+  toast(art === "ersetzen" ? plural(neu, "Position", "Positionen") + " geladen" : plural(neu, "neue Position", "neue Positionen") + " hinzugefügt");
+}
+
+$("btnImportErsetzen").addEventListener("click", () => {
+  if (confirm("Alle aktuellen Positionen durch die Sicherung ersetzen?")) importAusfuehren("ersetzen");
+});
+$("btnImportHinzu").addEventListener("click", () => importAusfuehren("hinzu"));
+$("btnImportAbbrechen").addEventListener("click", () => { importPositionen = null; schliesseImport(); });
+$("overlayImport").addEventListener("click", ev => { if (ev.target.id === "overlayImport"){ importPositionen = null; schliesseImport(); } });
+
+$("btnAllesLoeschen").addEventListener("click", () => {
+  if (!inventur.length){ toast("Keine Daten vorhanden"); return; }
+  if (!confirm(`Wirklich alle ${inventur.length} Positionen löschen? Das lässt sich nicht rückgängig machen.`)) return;
+  inventur = [];
+  detailKey = null;
+  speichern();
+  renderAlles();
+  toast("Alle Daten gelöscht");
+});
+
+/* ---------- Etiketten-Scanner ---------- */
+const CDN = {
+  zxing: ["https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js",
+          "https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"],
+  tesseract: ["https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+              "https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js"]
+};
+
+const SCAN = {
+  aktiv: false, stream: null,
+  nativ: null, zxing: null,
+  worker: null, workerLaedt: false, ocrFehler: false,
+  frame: document.createElement("canvas"),
+  hilf: document.createElement("canvas"),
+  runde: 0, ocrDreh: 0,
+  codes: {}, felder: null,
+  flaecheManuell: false, fertigGemeldet: false,
+  modus: "live", fotoLaeuft: false, fotoUrl: null
+};
+
+const warte = ms => new Promise(r => setTimeout(r, ms));
+
+function ladeSkript(urls){
+  return new Promise((ok, fehler) => {
+    const versuche = i => {
+      if (i >= urls.length) return fehler(new Error("Bibliothek nicht geladen"));
+      const el = document.createElement("script");
+      el.src = urls[i]; el.async = true;
+      el.onload = () => ok();
+      el.onerror = () => { el.remove(); versuche(i + 1); };
+      document.head.appendChild(el);
+    };
+    versuche(0);
+  });
+}
+
+function leereFelder(){
+  const q = () => ({ k: null, n: 0, z: {} });
+  const f = () => ({ bc: q(), ocr: q(), ziel: q(), kandidat: null, wert: null, quelle: null, manuell: false, manuellWert: null });
+  return { material: f(), charge: f(), flaeche: f(), rolle: f() };
+}
+SCAN.felder = leereFelder();
+
+/* Welcher Barcode ist was? Charge = nur Ziffern, Materialnummer = Ziffern + Buchstaben */
+function saeubere(text){
+  return String(text)
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .trim()
+    .replace(/^[^0-9A-Za-z]+/, "")
+    .replace(/[^0-9A-Za-z]+$/, "");
+}
+
+/* Auf den Etiketten steht vor dem Barcode-Inhalt ein Kennzeichen:
+   "&" = Materialnummer, "%" = HF-Rollen-Nr. (nicht die Charge!) */
+function artVonRoh(roh){
+  const r = String(roh).replace(/[\x00-\x1f\x7f]/g, "").trim();
+  if (r.startsWith("%")) return /\d/.test(r) ? "rolle" : null;
+  if (r.startsWith("&")) return klassifiziere(saeubere(r)) === "material" ? "material" : null;
+  return klassifiziere(saeubere(r));
+}
+
+function klassifiziere(text){
+  const t = String(text).trim().toUpperCase();
+  if (/^\d{5,12}$/.test(t)) return "charge";
+  if (/^[0-9A-Z][0-9A-Z\-.\/]{3,39}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t)) return "material";
+  return null;
+}
+
+/* Ein Wert gilt als sicher, wenn er mehrmals gleich gelesen wurde
+   oder wenn Barcode und Schrift dasselbe ergeben */
+const REGELN = {
+  live: { bc: 2, ocr: { material: 3, charge: 3, flaeche: 2, rolle: 3 } },
+  foto: { bc: 1, ocr: { material: 2, charge: 2, flaeche: 2, rolle: 2 } }
+};
+
+function beobachte(name, wert, quelle, eigeneSchwelle){
+  const f = SCAN.felder[name];
+  if (f.wert !== null || f.manuell) return false;
+  const t = f[quelle];
+  const key = String(wert);
+  t.z[key] = (t.z[key] || 0) + 1;
+  t.k = wert;
+  t.n = t.z[key];
+
+  /* Angezeigt wird der bisher häufigste Wert über alle Quellen, nicht der letzte */
+  const summe = {};
+  ["bc", "ocr", "ziel"].forEach(qn => Object.entries(f[qn].z).forEach(([k, n]) => { summe[k] = (summe[k] || 0) + n; }));
+  const fuehrend = Object.entries(summe).sort((a, b) => b[1] - a[1])[0][0];
+  f.kandidat = typeof wert === "number" ? Number(fuehrend) : fuehrend;
+
+  const r = REGELN[SCAN.modus] || REGELN.live;
+  const noetig = eigeneSchwelle || (quelle === "bc" ? r.bc : r.ocr[name]);
+  /* Eine Quelle allein reicht nur mit klarer Mehrheit gegen andere Lesungen */
+  const zweiter = Math.max(0, ...Object.entries(t.z).filter(([k]) => k !== key).map(([, n]) => n));
+  const eigen = t.n >= noetig && t.n >= 2 * zweiter + (zweiter ? 1 : 0);
+  /* Zwei unabhängige Quellen mit demselben Wert sind am sichersten */
+  const bestaetigt = ["bc", "ocr", "ziel"].some(qn => qn !== quelle && f[qn].z[key]);
+  if (eigen || bestaetigt){
+    f.wert = wert;
+    f.quelle = bestaetigt ? "beide" : quelle;
+    return true;
+  }
+  return false;
+}
+
+/* Für den Vergleich Schrift/Barcode: typische Verwechsler gleich behandeln */
+function locker(s){
+  return String(s).toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1").replace(/S/g, "5").replace(/B/g, "8").replace(/Z/g, "2");
+}
+
+function mitte(punkte){
+  return { x: punkte.reduce((s, p) => s + p.x, 0) / punkte.length, y: punkte.reduce((s, p) => s + p.y, 0) / punkte.length };
+}
+
+/* --- Kamera öffnen / schließen --- */
+async function oeffneScanner(){
+  /* Ohne https gibt es kein Live-Bild: dann Foto mit der Handykamera aufnehmen */
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    SCAN.modus = "foto";
+    $("fotoKamera").click();
+    return;
+  }
+  SCAN.modus = "live";
+  $("scanVideo").hidden = false;
+  $("scanRahmen").hidden = false;
+  $("scanFoto").hidden = true;
+  $("scanner").classList.add("offen");
+  document.body.style.overflow = "hidden";
+  scanZuruecksetzen();
+  setzeStatus("Kamera wird gestartet …");
+
+  try {
+    let gespeichert = null;
+    try { gespeichert = localStorage.getItem(KEY_KAMERA); } catch(e){}
+    try { await starteKamera(gespeichert); }
+    catch(e){ if (gespeichert) await starteKamera(null); else throw e; }
+    if (!gespeichert) await waehleHauptkamera();
+    else { SCAN.kameras = await rueckKameras(); aktualisiereKameraKnoepfe(); }
+  } catch(e){
+    /* Live-Kamera nicht erlaubt: auf Foto-Modus umschalten */
+    SCAN.modus = "foto";
+    SCAN.aktiv = true;
+    aktualisierePanel();
+    setzeStatus("Live-Kamera nicht verfügbar. Tippe auf „Neues Foto“.");
+    return;
+  }
+  if (!$("scanner").classList.contains("offen")){ stoppeKamera(); return; }
+
+  SCAN.aktiv = true;
+  setzeStatus("Barcode-Erkennung wird geladen …");
+  try { await ladeBarcodeLeser(); }
+  catch(e){ setzeStatus("Barcode-Erkennung konnte nicht geladen werden. Internetverbindung prüfen."); return; }
+  if (!SCAN.aktiv) return;
+
+  aktualisierePanel();
+  barcodeSchleife();
+  ladeOcr();
+  ladeZiffernLeser();
+  ocrSchleife();
+}
+
+function schliesseScanner(){
+  SCAN.aktiv = false;
+  stoppeKamera();
+  $("scanFoto").hidden = true;
+  $("scanFoto").removeAttribute("src");
+  if (SCAN.fotoUrl){ URL.revokeObjectURL(SCAN.fotoUrl); SCAN.fotoUrl = null; }
+  $("scanner").classList.remove("offen");
+  document.body.style.overflow = "";
+  leereOverlay();
+}
+
+function scanZuruecksetzen(){
+  SCAN.felder = leereFelder();
+  SCAN.codes = {};
+  SCAN.flaecheManuell = false;
+  SCAN.fertigGemeldet = false;
+  SCAN.ocrDreh = 0;
+  SCAN.zuletztGelesen = "";
+  SCAN.zuletztText = "";
+  SCAN.rahmenDreh = 0;
+  SCAN.zielDreh = 0;
+  SCAN.zielFehl = { charge: 0, flaeche: 0 };
+  SCAN.zuletztCharge = "";
+  SCAN.zuletztFlaeche = "";
+  $("scanFlaeche").value = "";
+  $("scanMaterial").value = "";
+  $("scanCharge").value = "";
+  $("scanFertig").classList.remove("zeigen");
+  leereOverlay();
+  aktualisierePanel();
+}
+
+function setzeStatus(text){ $("scanStatus").textContent = text; }
+
+/* --- Kamera: Auswahl, Fokus, Zoom, Licht --- */
+const KEY_KAMERA = "inventur_kamera";
+
+function stoppeKamera(){
+  if (SCAN.stream){ SCAN.stream.getTracks().forEach(t => t.stop()); SCAN.stream = null; }
+  SCAN.track = null;
+  $("scanVideo").srcObject = null;
+}
+
+async function starteKamera(deviceId){
+  stoppeKamera();
+  const video = deviceId
+    ? { deviceId: { exact: deviceId }, width: { ideal: 2560 }, height: { ideal: 1440 } }
+    : { facingMode: { ideal: "environment" }, width: { ideal: 2560 }, height: { ideal: 1440 } };
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video });
+  SCAN.stream = stream;
+  const v = $("scanVideo");
+  v.srcObject = stream;
+  try { await v.play(); } catch(e){}
+  const track = stream.getVideoTracks()[0];
+  SCAN.track = track;
+  SCAN.caps = track.getCapabilities ? track.getCapabilities() : {};
+  SCAN.deviceId = (track.getSettings && track.getSettings().deviceId) || deviceId || null;
+  if (SCAN.caps.focusMode && SCAN.caps.focusMode.includes("continuous")){
+    try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); } catch(e){}
+  }
+  SCAN.licht = false;
+  SCAN.zoom = 1;
+  /* Leicht zoomen: dann kann man das Handy weiter weg halten und der Fokus sitzt */
+  if (SCAN.caps.zoom && SCAN.caps.zoom.max >= 1.5) await setzeZoom(Math.min(2, SCAN.caps.zoom.max));
+  aktualisiereKameraKnoepfe();
+}
+
+async function rueckKameras(){
+  try {
+    const alle = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    const hinten = alle.filter(d => /back|rück|rear|environment|hinten/i.test(d.label));
+    return hinten.length ? hinten : alle;
+  } catch(e){ return []; }
+}
+
+/* Viele Android-Handys haben mehrere Rückkameras; die Hauptkamera ("camera2 0") fokussiert am besten */
+async function waehleHauptkamera(){
+  const liste = await rueckKameras();
+  SCAN.kameras = liste;
+  const haupt = liste.find(d => /camera2 0\b|camera 0\b/i.test(d.label));
+  if (haupt && haupt.deviceId && haupt.deviceId !== SCAN.deviceId){
+    try { await starteKamera(haupt.deviceId); } catch(e){}
+  }
+  aktualisiereKameraKnoepfe();
+}
+
+async function setzeZoom(z){
+  if (!SCAN.track || !SCAN.caps.zoom) return;
+  const zoom = Math.max(SCAN.caps.zoom.min || 1, Math.min(z, SCAN.caps.zoom.max));
+  try { await SCAN.track.applyConstraints({ advanced: [{ zoom }] }); SCAN.zoom = zoom; } catch(e){}
+  aktualisiereKameraKnoepfe();
+}
+
+function aktualisiereKameraKnoepfe(){
+  const caps = SCAN.caps || {};
+  const zoomKn = $("btnZoom");
+  zoomKn.hidden = !(caps.zoom && caps.zoom.max >= 1.5);
+  zoomKn.textContent = (Math.round((SCAN.zoom || 1) * 10) / 10).toString().replace(".", ",") + "×";
+  $("btnLicht").hidden = !caps.torch;
+  $("btnLicht").setAttribute("aria-pressed", SCAN.licht ? "true" : "false");
+  $("btnKamera").hidden = !(SCAN.kameras && SCAN.kameras.length > 1);
+}
+
+$("btnZoom").addEventListener("click", () => {
+  const max = SCAN.caps.zoom.max;
+  const stufen = [1, 2, 3, 4].filter(z => z <= max);
+  const i = stufen.findIndex(z => z >= (SCAN.zoom || 1) - 0.05);
+  setzeZoom(stufen[(i + 1) % stufen.length]);
+});
+
+$("btnLicht").addEventListener("click", async () => {
+  if (!SCAN.track) return;
+  const an = !SCAN.licht;
+  try { await SCAN.track.applyConstraints({ advanced: [{ torch: an }] }); SCAN.licht = an; } catch(e){}
+  aktualisiereKameraKnoepfe();
+});
+
+$("btnKamera").addEventListener("click", async () => {
+  const liste = SCAN.kameras || [];
+  if (liste.length < 2) return;
+  const i = liste.findIndex(d => d.deviceId === SCAN.deviceId);
+  const naechste = liste[(i + 1) % liste.length];
+  try {
+    await starteKamera(naechste.deviceId);
+    try { localStorage.setItem(KEY_KAMERA, naechste.deviceId); } catch(e){}
+    toast("Kamera " + ((i + 1) % liste.length + 1) + " von " + liste.length);
+  } catch(e){ toast("Diese Kamera lässt sich nicht öffnen"); }
+});
+
+/* --- Barcode-Leser: eingebaut (Android/Chrome) plus ZXing als zweiter Leser --- */
+async function ladeZxing(){
+  if (SCAN.zxing) return;
+  await ladeSkript(CDN.zxing);
+  const Z = window.ZXing;
+  const hints = new Map();
+  hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39]);
+  hints.set(Z.DecodeHintType.TRY_HARDER, true);
+  const reader = new Z.MultiFormatReader();
+  reader.setHints(hints);
+  SCAN.zxing = reader;
+}
+
+async function ladeBarcodeLeser(){
+  if (!SCAN.nativ && "BarcodeDetector" in window){
+    try {
+      const vorhanden = await BarcodeDetector.getSupportedFormats();
+      const formate = ["code_128", "code_39", "data_matrix", "qr_code"].filter(f => vorhanden.includes(f));
+      if (formate.length) SCAN.nativ = new BarcodeDetector({ formats: formate });
+    } catch(e){}
+  }
+  if (SCAN.nativ){
+    ladeZxing().catch(() => {});   /* zweiter Leser im Hintergrund */
+    return;
+  }
+  await ladeZxing();
+}
+
+function holeFrame(maxSeite){
+  const v = $("scanVideo");
+  const vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  const s = Math.min(1, maxSeite / Math.max(vw, vh));
+  const c = SCAN.frame;
+  c.width = Math.round(vw * s);
+  c.height = Math.round(vh * s);
+  c.getContext("2d", { willReadFrequently: true }).drawImage(v, 0, 0, c.width, c.height);
+  return { canvas: c, s };
+}
+
+async function findeCodesNativ(c){
+  const treffer = await SCAN.nativ.detect(c);
+  return treffer.map(r => {
+    let punkte = (r.cornerPoints && r.cornerPoints.length === 4) ? r.cornerPoints.map(p => ({ x: p.x, y: p.y })) : null;
+    if (!punkte){
+      const b = r.boundingBox;
+      punkte = [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y }, { x: b.x + b.width, y: b.y + b.height }, { x: b.x, y: b.y + b.height }];
+    }
+    return { text: r.rawValue, punkte };
+  });
+}
+
+/* ZXing liest pro Durchgang einen Code; danach wird er weiß übermalt und weitergesucht */
+function findeCodesZxing(c, drehen){
+  const Z = window.ZXing;
+  const w = c.width, h = c.height;
+  let quelle = c;
+  if (drehen){
+    const r = SCAN.hilf;
+    r.width = h; r.height = w;
+    const x = r.getContext("2d", { willReadFrequently: true });
+    x.save(); x.translate(h, 0); x.rotate(Math.PI / 2); x.drawImage(c, 0, 0); x.restore();
+    quelle = r;
+  }
+  const zurueck = p => drehen ? { x: p.y, y: h - p.x } : p;
+  const ctx = quelle.getContext("2d", { willReadFrequently: true });
+  const gefunden = [];
+
+  for (let i = 0; i < 3; i++){
+    let erg;
+    try {
+      const lum = new Z.HTMLCanvasElementLuminanceSource(quelle);
+      const bmp = new Z.BinaryBitmap(new Z.HybridBinarizer(lum));
+      erg = SCAN.zxing.decodeWithState(bmp);
+    } catch(e){ break; }
+    const rp = erg.getResultPoints().map(p => ({ x: p.getX(), y: p.getY() }));
+    if (rp.length < 2) break;
+    const a = rp[0], b = rp[rp.length - 1];
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+    const nx = -uy, ny = ux, hh = L * 0.14, ext = L * 0.05;
+    const ecken = [
+      { x: a.x - ux * ext - nx * hh, y: a.y - uy * ext - ny * hh },
+      { x: b.x + ux * ext - nx * hh, y: b.y + uy * ext - ny * hh },
+      { x: b.x + ux * ext + nx * hh, y: b.y + uy * ext + ny * hh },
+      { x: a.x - ux * ext + nx * hh, y: a.y - uy * ext + ny * hh }
+    ];
+    const text = erg.getText();
+    if (!gefunden.some(g => g.text === text)) gefunden.push({ text, zx: true, punkte: ecken.map(zurueck) });
+
+    ctx.save();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = L * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(a.x - ux * ext, a.y - uy * ext);
+    ctx.lineTo(b.x + ux * ext, b.y + uy * ext);
+    ctx.stroke();
+    ctx.restore();
+  }
+  return gefunden;
+}
+
+/* ZXing abwechselnd auf ganzem Bild und auf der Bildmitte in voller Auflösung, quer und hochkant */
+function zxingAufVideo(v){
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const m = (SCAN.zrunde = (SCAN.zrunde || 0) + 1) % 4;
+  const mitteNur = m % 2 === 1, drehen = m >= 2;
+  let sx = 0, sy = 0, sw = vw, sh = vh;
+  if (mitteNur){ sw = vw * 0.7; sh = vh * 0.6; sx = (vw - sw) / 2; sy = (vh - sh) / 2; }
+  const s = Math.min(1, 1400 / Math.max(sw, sh));
+  const c = SCAN.frame;
+  c.width = Math.round(sw * s);
+  c.height = Math.round(sh * s);
+  c.getContext("2d", { willReadFrequently: true }).drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return findeCodesZxing(c, drehen).map(k => ({ text: k.text, zx: true, punkte: k.punkte.map(p => ({ x: sx + p.x / s, y: sy + p.y / s })) }));
+}
+
+async function barcodeSchleife(){
+  while (SCAN.aktiv){
+    const start = performance.now();
+    try {
+      const v = $("scanVideo");
+      if (v.readyState >= 2 && v.videoWidth){
+        let liste = [];
+        if (SCAN.nativ){
+          try { liste = await findeCodesNativ(v); } catch(e){ SCAN.nativFehler = (SCAN.nativFehler || 0) + 1; }
+        }
+        /* Findet der eingebaute Leser nichts, probiert ZXing es auch */
+        if (SCAN.zxing && liste.length === 0) liste = zxingAufVideo(v);
+        const gesehen = new Set();
+        liste = liste
+          .map(c => ({ text: saeubere(c.text), roh: String(c.text), art: artVonRoh(c.text), zx: !!c.zx, punkte: c.punkte }))
+          .filter(c => c.text && !gesehen.has(c.text) && gesehen.add(c.text));
+        if (liste.length) SCAN.zuletztGelesen = liste.map(c => c.roh).join(" | ");
+        if (SCAN.aktiv) verarbeiteCodes(liste, v.videoWidth, v.videoHeight);
+        zeigeDiagnose(v);
+      }
+    } catch(e){ console.warn(e); }
+    const ruhig = SCAN.felder.material.wert !== null && SCAN.felder.rolle.wert !== null;
+    await warte(Math.max(30, (ruhig ? 300 : 110) - (performance.now() - start)));
+  }
+}
+
+function zeigeDiagnose(v){
+  const leser = [SCAN.nativ ? "eingebaut" : null, SCAN.zxing ? "ZXing" : null].filter(Boolean).join(" + ") || "lädt";
+  const teile = [
+    "Leser: " + leser,
+    "Bild " + v.videoWidth + "×" + v.videoHeight,
+    SCAN.caps && SCAN.caps.zoom ? "Zoom " + String(SCAN.zoom).replace(".", ",") + "×" : null,
+    "Barcode: " + (SCAN.zuletztGelesen || "noch nichts"),
+    "Schrift: " + (SCAN.zuletztText || (SCAN.worker ? "noch nichts" : "lädt")),
+    null
+  ].filter(Boolean);
+  $("scanDiag").textContent = teile.join(", ");
+}
+
+/* Pro Feld den Code nehmen, der am nächsten an der Bildmitte liegt */
+function verarbeiteCodes(liste, vw, vh){
+  const jetzt = Date.now();
+  const beste = {};
+  liste.forEach(c => {
+    const art = c.art !== undefined ? c.art : klassifiziere(c.text);
+    if (!art) return;
+    const m = mitte(c.punkte);
+    const d = Math.hypot(m.x - vw / 2, m.y - vh / 2);
+    if (!beste[art] || d < beste[art].d) beste[art] = { ...c, d };
+  });
+  let neu = false;
+  ["material", "charge", "rolle"].forEach(art => {
+    if (!beste[art]) return;
+    /* Eine Zahl, die schon als Rollen-Nr. bekannt ist, ist nie die Charge */
+    if (art === "charge" && istRolle(beste[art].text)) return;
+    SCAN.codes[art] = { ...beste[art], zeit: jetzt };
+    if (beobachte(art, beste[art].text, "bc")) neu = true;
+  });
+  zeichneOverlay(liste, vw, vh);
+  if (neu && navigator.vibrate) navigator.vibrate(30);
+  aktualisierePanel();
+}
+
+function leereOverlay(){
+  const ov = $("scanOverlay");
+  ov.getContext("2d").clearRect(0, 0, ov.width, ov.height);
+}
+
+function zeichneOverlay(liste, vw, vh){
+  const ov = $("scanOverlay");
+  const box = ov.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const bw = Math.round(box.width * dpr), bh = Math.round(box.height * dpr);
+  if (ov.width !== bw || ov.height !== bh){ ov.width = bw; ov.height = bh; }
+  const ctx = ov.getContext("2d");
+  ctx.clearRect(0, 0, bw, bh);
+  const sc = SCAN.modus === "foto" ? Math.min(box.width / vw, box.height / vh) : Math.max(box.width / vw, box.height / vh);
+  const ox = (box.width - vw * sc) / 2, oy = (box.height - vh * sc) / 2;
+  const map = p => ({ x: (p.x * sc + ox) * dpr, y: (p.y * sc + oy) * dpr });
+
+  liste.forEach(c => {
+    const art = c.art !== undefined ? c.art : klassifiziere(c.text);
+    const f = art ? SCAN.felder[art] : null;
+    const sicher = f && f.wert === c.text;
+    const pts = c.punkte.map(map);
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.closePath();
+    ctx.lineWidth = 4 * dpr;
+    ctx.strokeStyle = sicher ? "#1E8E3E" : art ? "#FFFF00" : "rgba(255,255,255,.7)";
+    ctx.fillStyle = sicher ? "rgba(30,142,62,.28)" : art ? "rgba(255,255,0,.18)" : "rgba(255,255,255,.1)";
+    ctx.fill();
+    ctx.stroke();
+  });
+}
+
+/* --- Texterkennung für die Fläche --- */
+async function ladeOcr(){
+  if (SCAN.worker || SCAN.workerLaedt) return;
+  SCAN.workerLaedt = true;
+  SCAN.ocrFehler = false;
+  aktualisierePanel();
+  try {
+    await ladeSkript(CDN.tesseract);
+    const w = await Tesseract.createWorker("eng");
+    await w.setParameters({ tessedit_pageseg_mode: "11" });
+    SCAN.worker = w;
+  } catch(e){
+    console.warn(e);
+    SCAN.ocrFehler = true;
+  }
+  SCAN.workerLaedt = false;
+  aktualisierePanel();
+}
+
+async function neuerZiffernLeser(){
+  await ladeSkript(CDN.tesseract);
+  const w = await Tesseract.createWorker("eng");
+  await w.setParameters({ tessedit_pageseg_mode: "7", tessedit_char_whitelist: "0123456789,." });
+  return w;
+}
+
+async function ladeZiffernLeser(){
+  if (SCAN.zifferLaedt || (SCAN.workerC && SCAN.workerF)) return;
+  SCAN.zifferLaedt = true;
+  try {
+    const [c, f] = await Promise.all([neuerZiffernLeser(), neuerZiffernLeser()]);
+    SCAN.workerC = c;
+    SCAN.workerF = f;
+  } catch(e){ console.warn(e); }
+  SCAN.zifferLaedt = false;
+}
+
+function frischeCodes(){
+  const jetzt = Date.now();
+  return ["material", "charge", "rolle"].map(a => SCAN.codes[a]).filter(c => c && jetzt - c.zeit < 1500);
+}
+
+/* Eine Zahl auf dem Kopf gelesen: Reihenfolge umgedreht, 6 und 9 vertauscht */
+function kopfstehend(z){
+  const m = { "0": "0", "1": "1", "2": "2", "5": "5", "6": "9", "8": "8", "9": "6" };
+  let out = "";
+  for (const ch of String(z).split("").reverse()){
+    if (!(ch in m)) return null;
+    out += m[ch];
+  }
+  return out;
+}
+
+function istRolle(wert){
+  if (wert === null) return false;
+  const r = SCAN.felder.rolle;
+  const bekannt = [r.wert, r.bc.k, r.ocr.k, ...Object.keys(r.bc.z), ...Object.keys(r.ocr.z)].filter(Boolean).map(String);
+  const w = String(wert), k = kopfstehend(w);
+  return bekannt.includes(w) || (k !== null && bekannt.includes(k));
+}
+
+function felderOffen(){
+  const F = SCAN.felder;
+  return !feldOk(F.material) || !feldOk(F.charge) || (F.flaeche.wert === null && !SCAN.flaecheManuell);
+}
+
+async function ocrSchleife(){
+  while (SCAN.aktiv){
+    if ((SCAN.worker || SCAN.workerC) && felderOffen()){
+      try { await ocrVersuch(); } catch(e){ console.warn(e); }
+    }
+    await warte(30);
+  }
+}
+
+const DREHUNGEN = [0, Math.PI / 2, -Math.PI / 2, Math.PI];
+
+/* Bereich um die Barcodes: Leserichtung des Barcodes = Leserichtung des Texts */
+function regionAusCodes(codes, dreh){
+  const pts = codes.flatMap(c => c.punkte);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const seite = Math.max(maxX - minX, maxY - minY, 80) * 1.35;
+  const haupt = SCAN.codes.material && codes.includes(SCAN.codes.material) ? SCAN.codes.material : codes[0];
+  const [p0, p1] = haupt.punkte;
+  return {
+    mx: (minX + maxX) / 2, my: (minY + maxY) / 2, w: seite, h: seite,
+    winkel: Math.atan2(p1.y - p0.y, p1.x - p0.x) + (dreh ? Math.PI : 0)
+  };
+}
+
+/* Ohne Barcode: der gestrichelte Rahmen im Live-Bild, beim Foto fast das ganze Bild */
+function regionAusRahmen(qw, qh, drehIndex){
+  let rx, ry, rw, rh;
+  if (SCAN.modus === "live"){
+    const bild = document.querySelector(".scan-bild").getBoundingClientRect();
+    const r = $("scanRahmen").getBoundingClientRect();
+    const sc = Math.max(bild.width / qw, bild.height / qh);
+    const ox = (bild.width - qw * sc) / 2, oy = (bild.height - qh * sc) / 2;
+    rx = (r.left - bild.left - ox) / sc; ry = (r.top - bild.top - oy) / sc;
+    rw = r.width / sc; rh = r.height / sc;
+  } else {
+    rw = qw * 0.96; rh = qh * 0.9; rx = (qw - rw) / 2; ry = (qh - rh) / 2;
+  }
+  const winkel = DREHUNGEN[drehIndex % 4];
+  const quer = Math.abs(Math.sin(winkel)) > 0.5;
+  return { mx: rx + rw / 2, my: ry + rh / 2, w: quer ? rh : rw, h: quer ? rw : rh, winkel };
+}
+
+async function ocrLesen(quelle, qw, qh, region, groesse, leser){
+  const sk = Math.min(2.5, 1600 * groesse / Math.max(region.w, region.h));
+  const o = document.createElement("canvas");
+  o.width = Math.max(1, Math.round(region.w * sk));
+  o.height = Math.max(1, Math.round(region.h * sk));
+  const x = o.getContext("2d");
+  x.fillStyle = "#fff";
+  x.fillRect(0, 0, o.width, o.height);
+  try { x.filter = "grayscale(1) contrast(1.3)"; } catch(e){}
+  x.translate(o.width / 2, o.height / 2);
+  x.scale(sk, sk);
+  x.rotate(-region.winkel);
+  x.drawImage(quelle, -region.mx, -region.my, qw, qh);
+  const { data } = await (leser || SCAN.worker).recognize(o, {}, { text: true, blocks: true });
+  return data;
+}
+
+/* Bereich über einem Barcode: dort steht auf den Etiketten die Charge.
+   Wo die Balken oben enden, wird im Bild gemessen, weil die Leselinie
+   des Barcodes irgendwo in der Balkenhöhe liegen kann. */
+function balkenKanten(quelle, qw, qh, m, L, winkel){
+  const W = 200, sk = W / L, H = Math.round(L * 0.9 * sk);
+  const c = SCAN.hilf;
+  c.width = W; c.height = H;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.save();
+  x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
+  x.translate(W / 2, H / 2); x.scale(sk, sk); x.rotate(-winkel);
+  x.drawImage(quelle, -m.x, -m.y, qw, qh);
+  x.restore();
+  const d = x.getImageData(0, 0, W, H).data;
+  const kanten = [];
+  for (let y = 0; y < H; y++){
+    let summe = 0;
+    for (let i = Math.round(W * 0.1); i < Math.round(W * 0.9); i++){
+      const p = (y * W + i) * 4, q = p + 4;
+      summe += Math.abs(d[p] + d[p + 1] + d[p + 2] - d[q] - d[q + 1] - d[q + 2]);
+    }
+    kanten.push(summe);
+  }
+  const mz = Math.round(H / 2);
+  const bezug = Math.max(...kanten.slice(mz - 2, mz + 3));
+  if (!bezug) return null;
+  let o = mz, u = mz;
+  while (o > 0 && kanten[o - 1] > bezug * 0.35) o--;
+  while (u < H - 1 && kanten[u + 1] > bezug * 0.35) u++;
+  return { oben: (o - H / 2) / sk, unten: (u - H / 2) / sk };
+}
+
+function codeGeometrie(code, dreh, quelle, qw, qh){
+  const [a, b] = code.punkte;
+  const m = mitte(code.punkte);
+  const L = (Math.hypot(b.x - a.x, b.y - a.y) || 1) / (code.zx ? 1.1 : 1);
+  const winkel = Math.atan2(b.y - a.y, b.x - a.x) + (dreh ? Math.PI : 0);
+  const k = quelle ? balkenKanten(quelle, qw, qh, m, L, winkel) : null;
+  let oben = k ? k.oben : null, unten = k ? k.unten : null;
+  if (oben === null || oben > 0 || oben < -0.35 * L) oben = -0.09 * L;
+  if (unten === null || unten < 0 || unten > 0.35 * L) unten = 0.09 * L;
+  return { m, L, winkel, oben, unten };
+}
+
+/* t = Abstand quer zum Barcode (negativ = darüber),
+   von/bis = Anteil der Barcodelänge vom Barcode-Anfang aus */
+function regionBeiCode(g, t, von, bis, h){
+  const s = (von + bis) / 2 - 0.5;
+  const ux = Math.cos(g.winkel), uy = Math.sin(g.winkel);
+  const mx = g.m.x + ux * s * g.L - Math.sin(g.winkel) * t;
+  const my = g.m.y + uy * s * g.L + Math.cos(g.winkel) * t;
+  return { mx, my, w: (bis - von) * g.L, h, winkel: g.winkel };
+}
+
+/* Charge: das Kästchen knapp über den Balken des Rollen-Barcodes, ohne das Wort "Charge:" */
+function regionUeberCode(code, dreh, quelle, qw, qh){
+  const g = codeGeometrie(code, dreh, quelle, qw, qh);
+  return regionBeiCode(g, g.oben - 0.105 * g.L, 0.16, 1.0, g.L * 0.19);
+}
+
+/* Fläche: das Wertkästchen in der Zeile unter dem Barcode der Materialnummer */
+function regionUnterCode(code, quelle, qw, qh){
+  const g = codeGeometrie(code, 0, quelle, qw, qh);
+  return regionBeiCode(g, g.unten + 0.064 * g.L, 0.5, 0.75, g.L * 0.10);
+}
+
+/* Größte Zahl mit 6–10 Ziffern im Bereich; Balkenreste ("1111111") werden verworfen */
+function chargeAusZiffern(data){
+  const w = woerter(data);
+  let beste = null, score = -1;
+  w.forEach(x => {
+    const c = alsZiffern(x.text);
+    if (!c || istRolle(c)) return;
+    if (new Set(c).size <= 2) return;
+    const sc = x.h + (c.length === 7 ? 5 : 0) + x.conf / 20;
+    if (sc > score){ score = sc; beste = c; }
+  });
+  if (!w.length){
+    const t = (String(data.text || "").match(/\d{6,10}/g) || []).filter(c => !istRolle(c) && new Set(c).size > 2);
+    beste = t.find(c => c.length === 7) || t[0] || null;
+  }
+  return beste;
+}
+
+function chargeAusZeile(text){
+  const t = String(text || "").replace(/[\s,.]+/g, "");
+  const treffer = (t.match(/\d{6,10}/g) || []).filter(c => !istRolle(c) && new Set(c).size > 2);
+  return treffer.find(c => c.length === 7) || treffer[0] || null;
+}
+
+function flaecheAusZeile(text){
+  const m = String(text || "").match(/(\d{1,4})\s*[,.]\s*(\d{3})/);
+  if (!m) return null;
+  const w = parseFloat(m[1] + "." + m[2]);
+  return w > 0 && w < 10000 ? w : null;
+}
+
+async function leseChargeUeberRolle(quelle, qw, qh, dreh, groesse){
+  const rc = SCAN.codes.rolle;
+  if (!rc || !SCAN.workerC) return null;
+  const data = await ocrLesen(quelle, qw, qh, regionUeberCode(rc, dreh, quelle, qw, qh), groesse, SCAN.workerC);
+  return chargeAusZeile(data.text);
+}
+
+async function leseFlaecheUnterMaterial(quelle, qw, qh, groesse){
+  const mc = SCAN.codes.material;
+  if (!mc || !SCAN.workerF) return null;
+  const data = await ocrLesen(quelle, qw, qh, regionUnterCode(mc, quelle, qw, qh), groesse, SCAN.workerF);
+  return flaecheAusZeile(data.text);
+}
+
+async function zielCharge(v, vw, vh){
+  const dreh = SCAN.nativ ? SCAN.zielDreh : 0;
+  const c = await leseChargeUeberRolle(v, vw, vh, dreh, 0.3);
+  if (!SCAN.aktiv) return;
+  if (c){
+    SCAN.zielFehl.charge = 0;
+    SCAN.zuletztCharge = c;
+    if (beobachte("charge", c, "ziel", 2) && navigator.vibrate) navigator.vibrate(30);
+  } else {
+    SCAN.zielFehl.charge++;
+    if (SCAN.nativ) SCAN.zielDreh = SCAN.zielDreh ? 0 : 1;
+  }
+}
+
+async function zielFlaeche(v, vw, vh){
+  const F = SCAN.felder;
+  const fl = await leseFlaecheUnterMaterial(v, vw, vh, 0.2);
+  if (!SCAN.aktiv) return;
+  if (fl !== null && !SCAN.flaecheManuell && F.flaeche.wert === null){
+    SCAN.zielFehl.flaeche = 0;
+    SCAN.zuletztFlaeche = fmt(fl);
+    if (beobachte("flaeche", fl, "ziel", 2) && navigator.vibrate) navigator.vibrate(30);
+    $("scanFlaeche").value = fmt(F.flaeche.wert !== null ? F.flaeche.wert : F.flaeche.kandidat);
+  } else {
+    SCAN.zielFehl.flaeche++;
+  }
+}
+
+async function ocrVersuch(){
+  const v = $("scanVideo");
+  if (!v.videoWidth) return;
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const F = SCAN.felder;
+  const jetzt = Date.now();
+  const frisch = c => c && jetzt - c.zeit < 1200;
+  SCAN.ocrRunde = (SCAN.ocrRunde || 0) + 1;
+  SCAN.zielFehl = SCAN.zielFehl || { charge: 0, flaeche: 0 };
+
+  const jobs = [];
+  if (SCAN.workerC && !feldOk(F.charge) && frisch(SCAN.codes.rolle)) jobs.push(zielCharge(v, vw, vh));
+  if (SCAN.workerF && F.flaeche.wert === null && !SCAN.flaecheManuell && frisch(SCAN.codes.material)) jobs.push(zielFlaeche(v, vw, vh));
+
+  /* Ganzes Etikett nur, wenn gezielt nichts möglich ist oder es mehrmals nicht klappt */
+  const haengt = SCAN.zielFehl.charge >= 5 || SCAN.zielFehl.flaeche >= 5;
+  if (SCAN.worker && (!jobs.length || (haengt && SCAN.ocrRunde % 4 === 0)) && felderOffen()){
+    jobs.push((async () => {
+      const codes = frischeCodes();
+      const region = codes.length ? regionAusCodes(codes, SCAN.ocrDreh) : regionAusRahmen(vw, vh, SCAN.rahmenDreh);
+      const data = await ocrLesen(v, vw, vh, region, 0.65);
+      if (!SCAN.aktiv) return;
+      if (!uebernehmeOcr(data)){
+        if (codes.length) SCAN.ocrDreh = SCAN.ocrDreh ? 0 : 1;
+        else SCAN.rahmenDreh = (SCAN.rahmenDreh + 1) % 4;
+      }
+    })());
+  }
+  if (!jobs.length){ await warte(100); return; }
+  await Promise.all(jobs);
+  SCAN.zuletztText = [SCAN.zuletztCharge && "Charge " + SCAN.zuletztCharge, SCAN.zuletztFlaeche && "Fläche " + SCAN.zuletztFlaeche].filter(Boolean).join(", ") || SCAN.zuletztText;
+  aktualisierePanel();
+}
+
+/* Gelesenen Text auswerten und in die Felder übernehmen; true = etwas gefunden */
+function uebernehmeOcr(data){
+  const e = leseEtikett(data);
+  const gefunden = [e.material, e.charge, e.flaeche !== null ? fmt(e.flaeche) : null].filter(Boolean);
+  if (gefunden.length) SCAN.zuletztText = gefunden.join(" | ");
+  let neu = false;
+  if (e.material){
+    let m = e.material;
+    const bc = SCAN.felder.material.bc.k;
+    if (bc && locker(bc) === locker(m)) m = bc;
+    if (beobachte("material", m, "ocr")) neu = true;
+  }
+  if (e.rolle){
+    if (beobachte("rolle", e.rolle, "ocr")) neu = true;
+  }
+  if (e.charge && !istRolle(e.charge)){
+    let c = e.charge;
+    const bc = SCAN.felder.charge.bc.k;
+    if (bc && locker(bc) === locker(c)) c = bc;
+    if (beobachte("charge", c, "ocr")) neu = true;
+  }
+  if (e.flaeche !== null && !SCAN.flaecheManuell && SCAN.felder.flaeche.wert === null){
+    if (beobachte("flaeche", e.flaeche, "ocr")) neu = true;
+    $("scanFlaeche").value = fmt(SCAN.felder.flaeche.wert !== null ? SCAN.felder.flaeche.wert : e.flaeche);
+  }
+  if (neu && navigator.vibrate) navigator.vibrate(30);
+  aktualisierePanel();
+  return gefunden.length > 0;
+}
+
+/* --- Etikett-Text zerlegen --- */
+function woerter(data){
+  let w = [];
+  if (Array.isArray(data.words) && data.words.length) w = data.words;
+  else if (Array.isArray(data.blocks)){
+    data.blocks.forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => (l.words || []).forEach(x => w.push(x)))));
+  }
+  return w.map(x => ({
+    text: String(x.text || "").trim(),
+    h: x.bbox ? Math.abs(x.bbox.y1 - x.bbox.y0) : 0,
+    conf: Number(x.confidence) || 0
+  })).filter(x => x.text);
+}
+
+/* Ziffern-Verwechsler nur in Wörtern korrigieren, die fast nur aus Ziffern bestehen */
+function alsZiffern(t){
+  const s = t.replace(/^[^0-9A-Za-z]+|[^0-9A-Za-z]+$/g, "");
+  const ziffern = (s.match(/\d/g) || []).length;
+  if (s.length < 6 || s.length > 10 || ziffern < s.length - 1) return null;
+  const k = s.replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/S/g, "5").replace(/B/g, "8");
+  return /^\d{6,10}$/.test(k) ? k : null;
+}
+
+function alsMaterial(t){
+  let s = t.toUpperCase().replace(/^[^0-9A-Z]+|[^0-9A-Z]+$/g, "");
+  /* O zwischen oder vor Ziffern ist fast immer eine Null */
+  s = s.replace(/O(?=\d)|(?<=\d)O/g, "0");
+  if (!/^\d[0-9A-Z]{5,}(-[0-9A-Z]{1,4})?$/.test(s)) return null;
+  if (!/[A-Z]/.test(s) || (s.match(/\d/g) || []).length < 4) return null;
+  return s;
+}
+
+function leseEtikett(data){
+  const w = woerter(data);
+  const maxH = Math.max(1, ...w.map(x => x.h));
+  let material = null, mScore = -1, charge = null, cScore = -1, rolle = null;
+
+  w.forEach((x, i) => {
+    const vorher = i > 0 ? w[i - 1].text : "";
+    const m = alsMaterial(x.text);
+    if (m){
+      const sc = x.h / maxH * 3 + x.conf / 100 + Math.min(m.length, 16) / 16;
+      if (sc > mScore){ mScore = sc; material = m; }
+    }
+    const c = alsZiffern(x.text);
+    if (c){
+      /* Die HF-Rollen-Nr. hat dasselbe Format, steht aber klein und hinter "Nr." */
+      if (/nr|rollen/i.test(vorher) && !/charg/i.test(vorher)){ rolle = c; return; }
+      let sc = x.h / maxH * 3 + x.conf / 100 + (c.length === 7 ? 0.5 : 0);
+      if (/charg/i.test(vorher)) sc += 2;
+      if (sc > cScore){ cScore = sc; charge = c; }
+    }
+  });
+
+  /* Rückfall, falls keine Wortliste kommt */
+  if (!w.length){
+    String(data.text || "").split(/\s+/).forEach(t => {
+      if (!material) material = alsMaterial(t);
+      if (!charge) charge = alsZiffern(t);
+    });
+  }
+  if (charge !== null && charge === rolle) charge = null;
+  return { material, charge, rolle, flaeche: findeFlaeche(data.text || "") };
+}
+
+/* --- Foto-Modus: Bild der Handykamera auswerten (geht auch ohne https) --- */
+function zeichneBild(img, maxSeite){
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const s = Math.min(1, maxSeite / Math.max(iw, ih));
+  const c = SCAN.frame;
+  c.width = Math.round(iw * s);
+  c.height = Math.round(ih * s);
+  c.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, c.width, c.height);
+  return s;
+}
+
+async function fotoAuswerten(datei){
+  SCAN.modus = "foto";
+  $("scanner").classList.add("offen");
+  document.body.style.overflow = "hidden";
+  scanZuruecksetzen();
+  SCAN.aktiv = true;
+  SCAN.fotoLaeuft = true;
+  $("scanVideo").hidden = true;
+  $("scanRahmen").hidden = true;
+  const img = $("scanFoto");
+  img.hidden = false;
+  if (SCAN.fotoUrl) URL.revokeObjectURL(SCAN.fotoUrl);
+  SCAN.fotoUrl = URL.createObjectURL(datei);
+  img.src = SCAN.fotoUrl;
+  aktualisierePanel();
+
+  try { await img.decode(); }
+  catch(e){ SCAN.fotoLaeuft = false; setzeStatus("Foto konnte nicht geöffnet werden."); return; }
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const ocrBereit = Promise.all([ladeOcr(), ladeZiffernLeser()]);
+
+  /* 1. Barcodes suchen, bei Bedarf in mehreren Größen */
+  try { await ladeBarcodeLeser(); } catch(e){}
+  try { await ladeZxing(); } catch(e){}
+  const liste = [];
+  const dazu = (l, s) => l.forEach(c => {
+    const t = saeubere(c.text);
+    if (t && !liste.some(x => x.text === t)) liste.push({ text: t, art: artVonRoh(c.text), zx: !!c.zx, punkte: c.punkte.map(p => ({ x: p.x / s, y: p.y / s })) });
+  });
+  const beide = () => { const a = liste.map(c => c.art); return a.includes("material") && a.includes("charge"); };
+  for (const groesse of [1600, 1100, 2400]){
+    try {
+      let s = zeichneBild(img, groesse);
+      if (SCAN.nativ){ try { dazu(await findeCodesNativ(SCAN.frame), s); } catch(e){} }
+      if (SCAN.zxing && !beide()){
+        s = zeichneBild(img, groesse);
+        dazu(findeCodesZxing(SCAN.frame, false), s);
+        s = zeichneBild(img, groesse);
+        dazu(findeCodesZxing(SCAN.frame, true), s);
+      }
+    } catch(e){ console.warn(e); }
+    if (beide()) break;
+  }
+  if (!SCAN.aktiv) return;
+  verarbeiteCodes(liste, iw, ih);
+
+  /* 2. Schrift lesen: Ausrichtung suchen, dann ein zweiter Durchgang zur Bestätigung */
+  await ocrBereit;
+  if (SCAN.workerC && SCAN.aktiv && SCAN.codes.rolle && SCAN.felder.charge.wert === null){
+    setzeStatus("Charge wird gelesen …");
+    for (const dreh of (SCAN.nativ ? [0, 1] : [0])){
+      try {
+        const c1 = await leseChargeUeberRolle(img, iw, ih, dreh, 0.5);
+        if (!c1) continue;
+        beobachte("charge", c1, "ziel", 2);
+        const c2 = await leseChargeUeberRolle(img, iw, ih, dreh, 0.7);
+        if (c2) beobachte("charge", c2, "ziel", 2);
+        break;
+      } catch(e){ console.warn(e); }
+    }
+    aktualisierePanel();
+  }
+  if (SCAN.workerF && SCAN.aktiv && SCAN.codes.material && SCAN.felder.flaeche.wert === null && !SCAN.flaecheManuell){
+    try {
+      const f1 = await leseFlaecheUnterMaterial(img, iw, ih, 0.5);
+      if (f1 !== null){
+        beobachte("flaeche", f1, "ziel", 2);
+        const f2 = await leseFlaecheUnterMaterial(img, iw, ih, 0.7);
+        if (f2 !== null) beobachte("flaeche", f2, "ziel", 2);
+        const fw = feldWert(SCAN.felder.flaeche);
+        if (fw !== null) $("scanFlaeche").value = fmt(fw);
+      }
+    } catch(e){ console.warn(e); }
+    aktualisierePanel();
+  }
+  if (SCAN.worker && SCAN.aktiv && felderOffen()){
+    const codes = ["material", "charge", "rolle"].map(a => SCAN.codes[a]).filter(Boolean);
+    const versuche = codes.length ? [0, 1].map(d => regionAusCodes(codes, d)) : [0, 1, 2, 3].map(d => regionAusRahmen(iw, ih, d));
+    for (const region of versuche){
+      try {
+        setzeStatus("Schrift wird gelesen …");
+        if (!uebernehmeOcr(await ocrLesen(img, iw, ih, region, 1))) continue;
+        if (felderOffen()) uebernehmeOcr(await ocrLesen(img, iw, ih, region, 0.8));
+        break;
+      } catch(e){ console.warn(e); }
+    }
+  }
+  SCAN.fotoLaeuft = false;
+  aktualisierePanel();
+}
+
+$("fotoKamera").addEventListener("change", ev => {
+  const datei = ev.target.files[0];
+  ev.target.value = "";
+  if (datei) fotoAuswerten(datei);
+});
+
+/* Sucht eine Zahl mit Komma und drei Nachkommastellen, bevorzugt in der Zeile mit "Fläche"/"m²" */
+function findeFlaeche(text){
+  let beste = null, besterScore = -1;
+  String(text).split(/\n/).forEach(zeile => {
+    const re = /(^|[^\d,.\-])(\d{1,4})\s?([,.])\s?(\d{3})(?![\d,.])/g;
+    let m;
+    while ((m = re.exec(zeile))){
+      const wert = parseFloat(m[2] + "." + m[4]);
+      if (!(wert > 0 && wert < 10000)) continue;
+      let score = 1;
+      if (/fl|che|m2|m²|\[m/i.test(zeile)) score += 2;
+      if (m[3] === ",") score += 1;
+      if (score > besterScore){ besterScore = score; beste = wert; }
+    }
+  });
+  return beste;
+}
+
+/* --- Anzeige unten im Scanner --- */
+function flaecheWert(){
+  const v = parseMenge($("scanFlaeche").value);
+  return isNaN(v) ? null : v;
+}
+
+function feldWert(f){
+  if (f.manuell) return f.manuellWert;
+  return f.wert !== null ? f.wert : f.kandidat;
+}
+function feldOk(f){ return f.manuell ? !!f.manuellWert : f.wert !== null; }
+
+function setzeFeld(valId, iconId, f){
+  const el = $(valId);
+  if (!f.manuell && document.activeElement !== el){
+    const t = feldWert(f);
+    el.value = t !== null ? t : "";
+  }
+  $(iconId).className = "status-icon " + (feldOk(f) ? "ok" : f.kandidat !== null ? "pruefen" : "");
+}
+
+/* Von Hand korrigiert: gilt sofort als bestätigt */
+function manuelleEingabe(name, el, saeubern){
+  const f = SCAN.felder[name];
+  const v = saeubern(el.value);
+  if (v){ f.manuell = true; f.manuellWert = v; }
+  else { SCAN.felder[name] = leereFelder()[name]; }
+  aktualisierePanel();
+}
+$("scanMaterial").addEventListener("input", ev => manuelleEingabe("material", ev.target, v => v.trim().toUpperCase()));
+$("scanCharge").addEventListener("input", ev => manuelleEingabe("charge", ev.target, v => v.replace(/\D/g, "")));
+
+function angleichen(feld, wert){
+  const vorhanden = inventur.find(e => schluessel(e[feld]) === schluessel(wert));
+  return vorhanden ? vorhanden[feld] : wert;
+}
+
+function aktualisierePanel(){
+  const F = SCAN.felder;
+  setzeFeld("scanMaterial", "iconMaterial", F.material);
+  setzeFeld("scanCharge", "iconCharge", F.charge);
+  const rolle = feldWert(F.rolle);
+  $("scanRolle").textContent = rolle ? "HF-Rollen-Nr.: " + rolle : "";
+
+  const fl = flaecheWert();
+  const flOk = SCAN.flaecheManuell ? fl !== null : F.flaeche.wert !== null;
+  $("iconFlaeche").className = "status-icon " + (flOk ? "ok" : F.flaeche.kandidat !== null ? "pruefen" : "");
+  $("scanFlaeche").placeholder = SCAN.ocrFehler ? "bitte eingeben"
+    : SCAN.workerLaedt ? "Texterkennung lädt …"
+    : "wird gelesen …";
+
+  const foto = SCAN.modus === "foto";
+  const komplett = feldOk(F.material) && feldOk(F.charge) && flOk;
+  /* Im Foto-Modus darf man gelbe (einmal gelesene) Werte nach Prüfung übernehmen */
+  const speicherbar = foto
+    ? feldWert(F.material) !== null && feldWert(F.charge) !== null && fl !== null
+    : komplett;
+  $("btnScanSpeichern").disabled = !speicherbar;
+  $("btnScanSpeichern").textContent = foto ? "Speichern, nächstes Foto" : "Speichern";
+  $("btnScanNeu").textContent = foto ? "Neues Foto" : "Neu scannen";
+  $("scanPanel").classList.toggle("komplett", komplett);
+
+  let hinweis = "";
+  if (SCAN.ocrFehler && !SCAN.flaecheManuell) hinweis = "Texterkennung nicht verfügbar. Fläche bitte von Hand eingeben.";
+  if (foto && speicherbar && !komplett) hinweis = "Gelb markierte Werte bitte kurz mit dem Etikett vergleichen.";
+  if (speicherbar){
+    const doppelt = inventur.some(e =>
+      schluessel(e.typ) === schluessel(feldWert(F.material)) &&
+      schluessel(e.charge) === schluessel(feldWert(F.charge)) &&
+      Math.abs(e.menge - fl) < 0.0005);
+    if (doppelt) hinweis = "Achtung: Eine Rolle mit genau diesen Werten ist schon erfasst.";
+  }
+  if (rolle && inventur.some(e => e.rolle === rolle)){
+    hinweis = "Achtung: Die Rolle " + rolle + " ist schon erfasst.";
+  }
+  $("scanHinweis").textContent = hinweis;
+
+  if (!SCAN.aktiv) return;
+  if (foto){
+    if (SCAN.fotoLaeuft) setzeStatus("Foto wird ausgewertet …");
+    else if (!SCAN.fotoUrl) {}
+    else if (feldWert(F.material) === null && feldWert(F.charge) === null) setzeStatus("Nichts erkannt. Neues Foto, näher ran und gerade halten.");
+    else if (feldWert(F.material) === null) setzeStatus("Materialnummer nicht erkannt. Neues Foto aufnehmen.");
+    else if (feldWert(F.charge) === null) setzeStatus("Charge nicht erkannt. Neues Foto aufnehmen.");
+    else if (fl === null) setzeStatus("Fläche nicht gelesen. Bitte eintippen.");
+    else setzeStatus(komplett ? "Alles erkannt. Werte prüfen und speichern." : "Gelbe Werte prüfen und speichern.");
+  }
+  else if (komplett) setzeStatus("Alles erkannt. Werte prüfen und speichern.");
+  else if (!feldOk(F.material) && !feldOk(F.charge)) setzeStatus("Etikett in den Rahmen halten, ruhig und gerade");
+  else if (!feldOk(F.material)) setzeStatus("Materialnummer fehlt noch: Barcode oder Schrift in den Rahmen");
+  else if (!feldOk(F.charge)) setzeStatus("Charge wird gelesen: Barcode unter der Charge ins Bild, ruhig halten");
+  else setzeStatus(SCAN.ocrFehler ? "Fläche bitte eingeben" : "Fläche wird gelesen, Etikett ruhig halten");
+
+  if (komplett && !SCAN.fertigGemeldet){
+    SCAN.fertigGemeldet = true;
+    if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+    const f = $("scanFertig");
+    f.classList.add("zeigen");
+    setTimeout(() => f.classList.remove("zeigen"), 900);
+  }
+  if (!komplett) SCAN.fertigGemeldet = false;
+}
+
+/* --- Knöpfe im Scanner --- */
+$("btnScannen").addEventListener("click", oeffneScanner);
+$("btnScanZu").addEventListener("click", schliesseScanner);
+$("btnScanNeu").addEventListener("click", () => {
+  if (SCAN.modus === "foto") $("fotoKamera").click();
+  else scanZuruecksetzen();
+});
+
+$("scanFlaeche").addEventListener("input", ev => {
+  if (ev.target.value.trim() === ""){
+    SCAN.flaecheManuell = false;
+    SCAN.felder.flaeche = leereFelder().flaeche;
+  } else {
+    SCAN.flaecheManuell = true;
+  }
+  aktualisierePanel();
+});
+
+$("btnScanSpeichern").addEventListener("click", () => {
+  const F = SCAN.felder;
+  const menge = flaecheWert();
+  if ($("btnScanSpeichern").disabled || feldWert(F.material) === null || feldWert(F.charge) === null || menge === null) return;
+  const typ = angleichen("typ", feldWert(F.material));
+  const charge = angleichen("charge", feldWert(F.charge));
+  const rolle = feldWert(F.rolle);
+  if (rolle && inventur.some(e => e.rolle === rolle) &&
+      !confirm("Die Rolle " + rolle + " ist schon erfasst. Trotzdem noch einmal speichern?")) return;
+  const eintrag = { id: neueId(), typ, charge, menge, zeit: Date.now() };
+  if (rolle) eintrag.rolle = rolle;
+  inventur.push(eintrag);
+  speichern();
+  renderAlles();
+  toast("Gespeichert: " + fmt(menge) + " m², Charge " + charge);
+  scanZuruecksetzen();
+  if (SCAN.modus === "foto") $("fotoKamera").click();
+});
+
+$("btnScanFormular").addEventListener("click", () => {
+  const F = SCAN.felder;
+  const typ = feldWert(F.material);
+  const charge = feldWert(F.charge);
+  const menge = $("scanFlaeche").value;
+  schliesseScanner();
+  zeigeTab("erfassen");
+  if (typ) $("typ").value = typ;
+  if (charge) $("charge").value = charge;
+  if (menge) $("menge").value = menge;
+  $("menge").focus();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && SCAN.aktiv && SCAN.modus === "live") schliesseScanner();
+});
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && $("scanner").classList.contains("offen")) schliesseScanner();
+});
+
+renderAlles();
+</script>
+</body>
+</html>
