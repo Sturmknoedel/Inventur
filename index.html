@@ -26,8 +26,11 @@
   --tabh:64px;
 }
 *{box-sizing:border-box}
-html,body{margin:0}
+html,body{margin:0;height:100%}
 body{
+  display:flex;flex-direction:column;
+  height:100vh;height:100dvh;
+  overflow:hidden;
   font-family:var(--font);
   background:var(--flaeche);
   color:var(--schwarz);
@@ -40,7 +43,7 @@ button,input{font:inherit;color:inherit}
 
 /* Kopfzeile */
 .kopf{
-  position:sticky;top:0;z-index:10;
+  flex:none;position:relative;z-index:10;
   background:var(--schwarz);color:var(--weiss);
   border-left:8px solid var(--gelb);
   padding:calc(var(--safe-top) + 12px) 16px 12px 14px;
@@ -52,7 +55,11 @@ button,input{font:inherit;color:inherit}
 .kopf .summe b{display:block;font-family:var(--cond);font-size:28px;color:var(--gelb);white-space:nowrap}
 .kopf .summe small{font-size:13px;color:#BDBDBD}
 
-main{max-width:640px;margin:0 auto;padding:16px 16px calc(var(--tabh) + var(--safe-bottom) + 28px)}
+main{
+  flex:1;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  padding:16px max(16px, calc(50% - 304px)) 28px;
+}
 .ansicht{display:none}
 .ansicht.aktiv{display:block}
 h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line-height:1.1}
@@ -218,7 +225,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 
 /* Tab-Leiste */
 .tabs{
-  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  flex:none;position:relative;z-index:20;
   background:var(--schwarz);display:flex;justify-content:center;
   padding-bottom:var(--safe-bottom);
 }
@@ -280,7 +287,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
   </div>
 </header>
 
-<main>
+<main id="inhalt">
 
   <!-- ERFASSEN -->
   <section id="v-erfassen" class="ansicht aktiv" aria-labelledby="t-erfassen">
@@ -708,7 +715,7 @@ function zeigeTab(name){
     if (t.dataset.tab === name) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
   });
-  window.scrollTo(0, 0);
+  $("inhalt").scrollTo(0, 0);
 }
 
 /* ---------- Neu erfassen ---------- */
@@ -840,13 +847,14 @@ document.addEventListener("click", ev => {
   if (detail){
     detailKey = detail.dataset.detail;
     renderUebersicht();
-    window.scrollTo(0, 0);
+    $("inhalt").scrollTo(0, 0);
     const anker = detail.dataset.anker;
     if (anker){
       const ziel = [...document.querySelectorAll("[data-ziel]")].find(el => el.dataset.ziel === anker);
       if (ziel){
-        const oben = ziel.getBoundingClientRect().top + window.scrollY - document.querySelector(".kopf").offsetHeight - 12;
-        window.scrollTo(0, oben);
+        const box = $("inhalt");
+        const oben = ziel.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+        box.scrollTo(0, oben);
         const liste = ziel.querySelector(".liste");
         liste.classList.add("ziel-markiert");
         setTimeout(() => liste.classList.remove("ziel-markiert"), 1300);
@@ -855,7 +863,7 @@ document.addEventListener("click", ev => {
     return;
   }
 
-  if (ev.target.closest("[data-zurueck]")){ detailKey = null; renderUebersicht(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest("[data-zurueck]")){ detailKey = null; renderUebersicht(); $("inhalt").scrollTo(0, 0); return; }
 
   const m = ev.target.closest("[data-modus]");
   if (m){ modus = m.dataset.modus; detailKey = null; sucheUebersicht = ""; renderUebersicht(); return; }
