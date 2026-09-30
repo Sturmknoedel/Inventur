@@ -26,11 +26,13 @@
   --tabh:64px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%}
+html{height:100%;overflow:hidden;overscroll-behavior:none}
+html,body{margin:0}
 body{
   display:flex;flex-direction:column;
-  height:100vh;height:100dvh;
-  overflow:hidden;
+  position:fixed;left:0;right:0;top:0;
+  height:100vh;height:100dvh;height:var(--app-h, 100dvh);
+  overflow:hidden;overscroll-behavior:none;
   font-family:var(--font);
   background:var(--flaeche);
   color:var(--schwarz);
@@ -51,6 +53,7 @@ button,input{font:inherit;color:inherit}
 }
 .kopf h1{margin:0;font-family:var(--cond);font-size:22px;font-weight:700;line-height:1.05}
 .kopf .marke{display:block;font-family:var(--font);font-size:13px;font-weight:500;color:#BDBDBD}
+.kopf .marke small{font-size:11px;color:#8A8A8A;margin-left:4px}
 .kopf .summe{text-align:right;line-height:1}
 .kopf .summe b{display:block;font-family:var(--cond);font-size:28px;color:var(--gelb);white-space:nowrap}
 .kopf .summe small{font-size:13px;color:#BDBDBD}
@@ -280,7 +283,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius</span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v13</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -474,6 +477,17 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* ---------- Höhe an den sichtbaren Bildschirm anpassen (Firefox blendet Leisten ein/aus) ---------- */
+function setzeHoehe(){
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty("--app-h", Math.round(h) + "px");
+}
+setzeHoehe();
+window.addEventListener("resize", setzeHoehe);
+window.addEventListener("orientationchange", () => setTimeout(setzeHoehe, 300));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", setzeHoehe);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) setTimeout(setzeHoehe, 100); });
+
 /* ---------- Daten ---------- */
 const KEY = "inventur";
 
