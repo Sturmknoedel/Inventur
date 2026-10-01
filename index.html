@@ -296,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v21</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v22</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -407,6 +407,10 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
         <span class="einheit">
           <input class="eingabe" id="eMenge" inputmode="decimal" enterkeyhint="done">
         </span>
+      </label>
+      <label class="feld">
+        <span>Rollen-Nr. / Serial Lot (optional)</span>
+        <input class="eingabe" id="eRolle" inputmode="numeric" autocomplete="off">
       </label>
       <p class="fehler" id="fehlerEdit" role="alert"></p>
       <div class="reihe">
@@ -826,6 +830,7 @@ function oeffneBearbeiten(id){
   $("eTyp").value = e.typ;
   $("eCharge").value = e.charge;
   $("eMenge").value = fmt(e.menge);
+  $("eRolle").value = e.rolle || "";
   $("fehlerEdit").textContent = "";
   ["eTyp", "eCharge", "eMenge"].forEach(i => $(i).classList.remove("falsch"));
   $("bearbeitenInfo").textContent = e.zeit ? "Erfasst am " + zeitText(e.zeit) : "";
@@ -853,6 +858,8 @@ $("formEdit").addEventListener("submit", ev => {
   e.typ = daten.typ;
   e.charge = daten.charge;
   e.menge = daten.menge;
+  const rolle = $("eRolle").value.trim();
+  if (rolle) e.rolle = rolle; else delete e.rolle;
   speichern();
   schliesseBearbeiten();
   renderAlles();
@@ -1639,6 +1646,37 @@ function ordneGore(liste){
   }
 }
 
+/* Auf einem Sartorius-Etikett steht der Rollen-Barcode in derselben Zeile rechts
+   neben dem Material-Barcode. Liegen mehrere Rollen im Bild, wird nur ein Paar
+   genommen, das so zusammenpasst. Ein Rollen-Barcode ohne passenden
+   Material-Barcode im selben Bild wird nicht übernommen. */
+function paareSartorius(liste, vw, vh){
+  const mats = liste.filter(c => c.art === "material");
+  const rollen = liste.filter(c => c.art === "rolle");
+  if (!rollen.length) return;
+  if (!mats.length){ rollen.forEach(r => r.art = null); return; }
+  const abstand = c => { const m = mitte(c.punkte); return Math.hypot(m.x - vw / 2, m.y - vh / 2); };
+  let bestes = null;
+  mats.forEach(mc => {
+    const [a, b] = mc.punkte;
+    const L = (Math.hypot(b.x - a.x, b.y - a.y) || 1) / (mc.zx ? 1.1 : 1);
+    const ux = (b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1), uy = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+    const mm = mitte(mc.punkte);
+    rollen.forEach(rc => {
+      const rm = mitte(rc.punkte);
+      const dx = rm.x - mm.x, dy = rm.y - mm.y;
+      const laengs = (dx * ux + dy * uy) / L;
+      const quer = Math.abs(-dx * uy + dy * ux) / L;
+      if (laengs < 0.6 || laengs > 2.0 || quer > 0.35) return;
+      const note = quer * 2 + abstand(mc) / Math.max(vw, vh);
+      if (!bestes || note < bestes.note) bestes = { mc, rc, note };
+    });
+  });
+  if (!bestes){ rollen.forEach(r => r.art = null); return; }
+  mats.forEach(m => { if (m !== bestes.mc) m.art = null; });
+  rollen.forEach(r => { if (r !== bestes.rc) r.art = null; });
+}
+
 function beendePause(){
   SCAN.pause = null;
 }
@@ -1669,6 +1707,7 @@ function verarbeiteCodes(liste, vw, vh){
   if (liste.some(c => /^[&%]/.test(String(c.roh !== undefined ? c.roh : c.text).trim()))) setzeProfil("sartorius");
   else if (liste.some(c => !c.art && (/^\d{10}$/.test(c.text) || /^\d{1,4}[.,]\d{1,3}$/.test(c.text)))) setzeProfil("gore");
   if (SCAN.profil === "gore") ordneGore(liste);
+  if (SCAN.profil === "sartorius") paareSartorius(liste, vw, vh);
   if (inPause(liste)){ leereOverlay(); aktualisierePanel(); return; }
 
   const beste = {};
