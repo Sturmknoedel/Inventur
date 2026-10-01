@@ -296,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v22</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v23</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -1267,6 +1267,7 @@ function scanZuruecksetzen(){
   SCAN.profil = null;
   SCAN.goreEinzel = 0;
   SCAN.zuletztCharge = "";
+  SCAN.rollenText = new Set();
   SCAN.zuletztFlaeche = "";
   $("scanFlaeche").value = "";
   $("scanMaterial").value = "";
@@ -1829,7 +1830,7 @@ function kopfstehend(z){
 function istRolle(wert){
   if (wert === null) return false;
   const r = SCAN.felder.rolle;
-  const bekannt = [r.wert, r.bc.k, r.ocr.k, ...Object.keys(r.bc.z), ...Object.keys(r.ocr.z)].filter(Boolean).map(String);
+  const bekannt = [r.wert, r.bc.k, r.ocr.k, ...Object.keys(r.bc.z), ...Object.keys(r.ocr.z), ...(SCAN.rollenText || [])].filter(Boolean).map(String);
   const w = String(wert), k = kopfstehend(w);
   return bekannt.includes(w) || (k !== null && bekannt.includes(k));
 }
@@ -2117,7 +2118,9 @@ function uebernehmeOcr(data){
     if (beobachte("material", m, "ocr")) neu = true;
   }
   if (e.rolle){
-    if (beobachte("rolle", e.rolle, "ocr")) neu = true;
+    /* Nur merken, damit die Zahl nie als Charge genommen wird. Übernommen wird die Rollen-Nr. nur per Barcode. */
+    SCAN.rollenText = SCAN.rollenText || new Set();
+    SCAN.rollenText.add(String(e.rolle));
   }
   if (e.charge && !istRolle(e.charge)){
     let c = e.charge;
@@ -2396,7 +2399,7 @@ function aktualisierePanel(){
   let hinweis = "";
   if (SCAN.ocrFehler && !SCAN.flaecheManuell) hinweis = "Texterkennung nicht verfügbar. Fläche bitte von Hand eingeben.";
   if (foto && speicherbar && !komplett) hinweis = "Gelb markierte Werte bitte kurz mit dem Etikett vergleichen.";
-  if (speicherbar){
+  if (speicherbar && !(rolle && F.rolle.wert !== null)){
     const doppelt = inventur.some(e =>
       schluessel(e.typ) === schluessel(feldWert(F.material)) &&
       schluessel(e.charge) === schluessel(feldWert(F.charge)) &&
