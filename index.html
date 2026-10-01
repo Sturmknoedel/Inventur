@@ -225,6 +225,10 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 .linkbtn{display:block;width:100%;margin-top:4px;min-height:40px;background:none;border:none;font-weight:600;text-decoration:underline;cursor:pointer}
 @media (max-height:680px){.scan-feld{padding:4px 10px}.scan-feld .val,.val-eingabe{font-size:19px}.status-icon{width:30px;height:30px}}
 
+/* Hinweis auf neue Version */
+.update{flex:none;display:block;width:100%;min-height:44px;padding:10px 16px;border:none;background:var(--gelb);color:var(--schwarz);font-weight:700;font-size:15px;cursor:pointer;text-align:center}
+.update[hidden]{display:none}
+
 /* Tab-Leiste */
 .tabs{
   flex:none;position:relative;z-index:20;
@@ -282,12 +286,14 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v16</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v18</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
   </div>
 </header>
+
+<button type="button" class="update" id="updateHinweis" hidden></button>
 
 <main id="inhalt">
 
@@ -476,6 +482,29 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* ---------- Neue Version erkennen ---------- */
+const APP_VERSION = (document.getElementById("version") || { textContent: "" }).textContent.trim();
+let letzteVersionsPruefung = 0;
+
+async function pruefeUpdate(){
+  if (location.protocol !== "https:" && location.protocol !== "http:") return;
+  if (Date.now() - letzteVersionsPruefung < 60000) return;
+  letzteVersionsPruefung = Date.now();
+  try {
+    const antwort = await fetch(location.pathname + "?pruefen=" + Date.now(), { cache: "no-store" });
+    if (!antwort.ok) return;
+    const text = await antwort.text();
+    const m = text.match(/id="version">\s*(v\d+)\s*</);
+    if (!m || m[1] === APP_VERSION) return;
+    const knopf = document.getElementById("updateHinweis");
+    knopf.textContent = "Neue Version " + m[1] + " verfügbar. Tippen zum Laden";
+    knopf.hidden = false;
+    knopf.onclick = () => location.replace(location.pathname + "?v=" + m[1] + "-" + Date.now());
+  } catch(e){}
+}
+setTimeout(pruefeUpdate, 1500);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pruefeUpdate(); });
+
 /* ---------- Daten ---------- */
 const KEY = "inventur";
 
@@ -1090,7 +1119,7 @@ function artVonRoh(roh){
   const r = String(roh).replace(/[\x00-\x1f\x7f]/g, "").trim();
   if (r.startsWith("%")) return /\d/.test(r) ? "rolle" : null;
   if (r.startsWith("&")) return klassifiziere(saeubere(r)) === "material" ? "material" : null;
-  return klassifiziere(saeubere(r));
+  return null;   /* ohne Kennzeichen: Zuordnung über das Etikett-Profil (z. B. Gore) */
 }
 
 function klassifiziere(text){
@@ -1215,6 +1244,8 @@ function scanZuruecksetzen(){
   SCAN.rahmenDreh = 0;
   SCAN.zielDreh = 0;
   SCAN.zielFehl = { charge: 0, flaeche: 0 };
+  SCAN.profil = null;
+  SCAN.goreEinzel = 0;
   SCAN.zuletztCharge = "";
   SCAN.zuletztFlaeche = "";
   $("scanFlaeche").value = "";
@@ -1468,6 +1499,7 @@ async function barcodeSchleife(){
 function zeigeDiagnose(v){
   const leser = [SCAN.nativ ? "eingebaut" : null, SCAN.zxing ? "ZXing" : null].filter(Boolean).join(" + ") || "lädt";
   const teile = [
+    "Etikett: " + ({ sartorius: "Sartorius", gore: "Gore" }[SCAN.profil] || "noch unbekannt"),
     "Leser: " + leser,
     "Bild " + v.videoWidth + "×" + v.videoHeight,
     SCAN.caps && SCAN.caps.zoom ? "Zoom " + String(SCAN.zoom).replace(".", ",") + "×" : null,
@@ -1479,11 +1511,61 @@ function zeigeDiagnose(v){
 }
 
 /* Pro Feld den Code nehmen, der am nächsten an der Bildmitte liegt */
+/* ---------- Etikett-Profile ----------
+   Sartorius: Barcodes mit "&" (Material) und "%" (Rollen-Nr.), Charge und Fläche nur als Schrift.
+   Gore: jedes Feld hat einen eigenen Barcode ohne Kennzeichen:
+     Customer Part Number (5–8 Ziffern)      = Materialnummer
+     Lot Number (10 Ziffern, obere)          = Charge
+     Serial Lot Number (10 Ziffern, untere)  = eindeutige Nummer gegen Doppelte
+     Quantity (z. B. 4.5)                    = Fläche in m²
+     Gore Part Number (z. B. L32553)         = wird ignoriert */
+const istMengeCode = t => /^\d{1,4}([.,]\d{1,3})?$/.test(t);
+
+function setzeProfil(p){
+  if (SCAN.profil === p) return;
+  SCAN.profil = p;
+  if (p === "gore"){
+    /* Was vorher nach Sartorius-Regeln gelesen wurde, gilt hier nicht */
+    const neu = leereFelder();
+    ["material", "charge", "flaeche", "rolle"].forEach(k => { if (!SCAN.felder[k].manuell) SCAN.felder[k] = neu[k]; });
+    if (!SCAN.flaecheManuell) $("scanFlaeche").value = "";
+    SCAN.codes = {};
+  }
+}
+
+function ordneGore(liste){
+  liste.forEach(c => {
+    if (c.art) return;
+    if (/^\d{5,8}$/.test(c.text)) c.art = "material";
+    else if (istMengeCode(c.text)) c.art = "menge";
+  });
+  const lots = liste.filter(c => !c.art && /^\d{10}$/.test(c.text));
+  if (lots.length >= 2){
+    /* Die obere 10-stellige Nummer ist die Lot Number, die untere die Serial Lot Number */
+    const [a, b] = lots[0].punkte;
+    const w = Math.atan2(b.y - a.y, b.x - a.x);
+    const nx = -Math.sin(w), ny = Math.cos(w);
+    lots.sort((p, q) => { const mp = mitte(p.punkte), mq = mitte(q.punkte); return (mp.x * nx + mp.y * ny) - (mq.x * nx + mq.y * ny); });
+    lots[0].art = "charge";
+    lots[1].art = "rolle";
+    SCAN.goreEinzel = 0;
+  } else if (lots.length === 1){
+    /* Nur eine 10-stellige Nummer, aber das Etikett ist ganz im Bild: dann ist es die Lot Number */
+    SCAN.goreEinzel = (SCAN.goreEinzel || 0) + 1;
+    if (SCAN.goreEinzel >= 8 && liste.some(c => c.art === "material") && liste.some(c => c.art === "menge")) lots[0].art = "charge";
+  }
+}
+
 function verarbeiteCodes(liste, vw, vh){
   const jetzt = Date.now();
+  liste.forEach(c => { if (c.art === undefined) c.art = artVonRoh(c.roh !== undefined ? c.roh : c.text); });
+  if (liste.some(c => /^[&%]/.test(String(c.roh !== undefined ? c.roh : c.text).trim()))) setzeProfil("sartorius");
+  else if (liste.some(c => !c.art && (/^\d{10}$/.test(c.text) || /^\d{1,4}[.,]\d{1,3}$/.test(c.text)))) setzeProfil("gore");
+  if (SCAN.profil === "gore") ordneGore(liste);
+
   const beste = {};
   liste.forEach(c => {
-    const art = c.art !== undefined ? c.art : klassifiziere(c.text);
+    const art = c.art;
     if (!art) return;
     const m = mitte(c.punkte);
     const d = Math.hypot(m.x - vw / 2, m.y - vh / 2);
@@ -1497,6 +1579,14 @@ function verarbeiteCodes(liste, vw, vh){
     SCAN.codes[art] = { ...beste[art], zeit: jetzt };
     if (beobachte(art, beste[art].text, "bc")) neu = true;
   });
+  if (beste.menge && !SCAN.flaecheManuell && SCAN.felder.flaeche.wert === null){
+    const wert = parseFloat(beste.menge.text.replace(",", "."));
+    if (wert > 0){
+      if (beobachte("flaeche", wert, "bc")) neu = true;
+      const fw = feldWert(SCAN.felder.flaeche);
+      if (fw !== null) $("scanFlaeche").value = fmt(Number(fw));
+    }
+  }
   zeichneOverlay(liste, vw, vh);
   if (neu && navigator.vibrate) navigator.vibrate(30);
   aktualisierePanel();
@@ -1520,9 +1610,10 @@ function zeichneOverlay(liste, vw, vh){
   const map = p => ({ x: (p.x * sc + ox) * dpr, y: (p.y * sc + oy) * dpr });
 
   liste.forEach(c => {
-    const art = c.art !== undefined ? c.art : klassifiziere(c.text);
-    const f = art ? SCAN.felder[art] : null;
-    const sicher = f && f.wert === c.text;
+    const art = c.art || null;
+    const f = art ? SCAN.felder[art === "menge" ? "flaeche" : art] : null;
+    const vergleich = art === "menge" ? parseFloat(c.text.replace(",", ".")) : c.text;
+    const sicher = f && f.wert !== null && String(f.wert) === String(vergleich);
     const pts = c.punkte.map(map);
     ctx.beginPath();
     pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
@@ -1603,7 +1694,7 @@ function felderOffen(){
 
 async function ocrSchleife(){
   while (SCAN.aktiv){
-    if ((SCAN.worker || SCAN.workerC) && felderOffen()){
+    if ((SCAN.worker || SCAN.workerC) && felderOffen() && SCAN.profil !== "gore"){
       try { await ocrVersuch(); } catch(e){ console.warn(e); }
     }
     await warte(30);
@@ -1967,9 +2058,13 @@ async function fotoAuswerten(datei){
   const liste = [];
   const dazu = (l, s) => l.forEach(c => {
     const t = saeubere(c.text);
-    if (t && !liste.some(x => x.text === t)) liste.push({ text: t, art: artVonRoh(c.text), zx: !!c.zx, punkte: c.punkte.map(p => ({ x: p.x / s, y: p.y / s })) });
+    if (t && !liste.some(x => x.text === t)) liste.push({ text: t, roh: String(c.text), zx: !!c.zx, punkte: c.punkte.map(p => ({ x: p.x / s, y: p.y / s })) });
   });
-  const beide = () => { const a = liste.map(c => c.art); return a.includes("material") && a.includes("charge"); };
+  const beide = () => {
+    const a = liste.map(c => artVonRoh(c.roh));
+    if (a.includes("material") && a.includes("rolle")) return true;
+    return liste.filter(c => /^\d{10}$/.test(c.text)).length >= 2 && liste.some(c => istMengeCode(c.text));
+  };
   for (const groesse of [1600, 1100, 2400]){
     try {
       let s = zeichneBild(img, groesse);
@@ -1988,6 +2083,7 @@ async function fotoAuswerten(datei){
 
   /* 2. Schrift lesen: Ausrichtung suchen, dann ein zweiter Durchgang zur Bestätigung */
   await ocrBereit;
+  if (SCAN.profil === "gore"){ SCAN.fotoLaeuft = false; aktualisierePanel(); return; }
   if (SCAN.workerC && SCAN.aktiv && SCAN.codes.rolle && SCAN.felder.charge.wert === null){
     setzeStatus("Charge wird gelesen …");
     for (const dreh of (SCAN.nativ ? [0, 1] : [0])){
@@ -2097,7 +2193,7 @@ function aktualisierePanel(){
   setzeFeld("scanMaterial", "iconMaterial", F.material);
   setzeFeld("scanCharge", "iconCharge", F.charge);
   const rolle = feldWert(F.rolle);
-  $("scanRolle").textContent = rolle ? "HF-Rollen-Nr.: " + rolle : "";
+  $("scanRolle").textContent = rolle ? (SCAN.profil === "gore" ? "Serial Lot Number: " : "HF-Rollen-Nr.: ") + rolle : "";
 
   const fl = flaecheWert();
   const flOk = SCAN.flaecheManuell ? fl !== null : F.flaeche.wert !== null;
@@ -2145,6 +2241,7 @@ function aktualisierePanel(){
   else if (komplett) setzeStatus("Alles erkannt. Werte prüfen und speichern.");
   else if (!feldOk(F.material) && !feldOk(F.charge)) setzeStatus("Etikett in den Rahmen halten, ruhig und gerade");
   else if (!feldOk(F.material)) setzeStatus("Materialnummer fehlt noch: Barcode oder Schrift in den Rahmen");
+  else if (SCAN.profil === "gore") setzeStatus("Ganzes Etikett ins Bild halten, alle Barcodes sichtbar");
   else if (!feldOk(F.charge)) setzeStatus("Charge wird gelesen: Barcode unter der Charge ins Bild, ruhig halten");
   else setzeStatus(SCAN.ocrFehler ? "Fläche bitte eingeben" : "Fläche wird gelesen, Etikett ruhig halten");
 
