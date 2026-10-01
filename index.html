@@ -271,6 +271,16 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
   opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
 }
 .toast.zeigen{opacity:1;transform:translateX(-50%)}
+.auto-zeile{display:flex;align-items:center;gap:10px;margin:8px 2px 0;font-size:14px;font-weight:600;min-height:36px}
+.auto-zeile input{width:22px;height:22px;accent-color:#1E8E3E;flex:none}
+.aktion-meldung{
+  position:fixed;left:50%;top:76px;z-index:70;transform:translateX(-50%) translateY(-8px);
+  display:flex;align-items:center;gap:14px;width:max-content;max-width:calc(100% - 24px);
+  background:#1E8E3E;color:#fff;font-weight:700;padding:8px 8px 8px 16px;border-radius:12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+}
+.aktion-meldung.zeigen{opacity:1;transform:translateX(-50%);pointer-events:auto}
+.aktion-meldung button{min-height:40px;padding:0 14px;border:2px solid #fff;border-radius:8px;background:none;color:#fff;font-weight:700;cursor:pointer}
 
 @media (prefers-reduced-motion:reduce){
   .sheet{animation:none}
@@ -286,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v18</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v19</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -470,6 +480,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
       <button type="button" class="btn btn-hell" id="btnScanNeu">Neu scannen</button>
       <button type="button" class="btn btn-gelb" id="btnScanSpeichern" disabled>Speichern</button>
     </div>
+    <label class="auto-zeile"><input type="checkbox" id="autoSpeichern"> Automatisch speichern, wenn alles grün ist</label>
     <button type="button" class="linkbtn" id="btnScanFormular">Im Formular bearbeiten</button>
   </div>
 </div>
@@ -480,6 +491,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <datalist id="dlChargen"></datalist>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="aktion-meldung" id="aktionMeldung" role="status" aria-live="polite"><span id="aktionText"></span><button type="button" id="aktionKnopf">Rückgängig</button></div>
 
 <script>
 /* ---------- Neue Version erkennen ---------- */
@@ -1234,6 +1246,7 @@ function schliesseScanner(){
 }
 
 function scanZuruecksetzen(){
+  clearTimeout(SCAN.autoTimer); SCAN.autoTimer = null;
   SCAN.felder = leereFelder();
   SCAN.codes = {};
   SCAN.flaecheManuell = false;
@@ -1366,6 +1379,70 @@ async function ladeZxing(){
   SCAN.zxing = reader;
 }
 
+/* zxing-cpp als WebAssembly in einem eigenen Hintergrund-Thread (Worker) */
+const WASM_URL = "https://cdn.jsdelivr.net/npm/zxing-wasm@2/dist/iife/reader/index.js";
+
+function ladeWasmLeser(){
+  if (SCAN.wasm) return Promise.resolve();
+  if (SCAN.wasmLaedt) return SCAN.wasmLaedt;
+  SCAN.wasmLaedt = new Promise((ok, fehler) => {
+    let worker;
+    try {
+      const code = `
+        importScripts(${JSON.stringify(WASM_URL)});
+        const OPT = { formats: ["Code128", "Code39"], tryHarder: true, tryRotate: true, maxNumberOfSymbols: 8 };
+        self.onmessage = async e => {
+          const { id, data, width, height } = e.data;
+          try {
+            const bild = new ImageData(new Uint8ClampedArray(data), width, height);
+            const r = await ZXingWASM.readBarcodes(bild, OPT);
+            self.postMessage({ id, ok: true, codes: r.filter(x => x.isValid !== false && x.text).map(x => ({ text: x.text, p: x.position })) });
+          } catch(err){ self.postMessage({ id, ok: false, fehler: String(err) }); }
+        };
+        (async () => {
+          try { await ZXingWASM.readBarcodes(new ImageData(8, 8), OPT); self.postMessage({ bereit: true }); }
+          catch(err){ self.postMessage({ bereit: false, fehler: String(err) }); }
+        })();`;
+      worker = new Worker(URL.createObjectURL(new Blob([code], { type: "text/javascript" })));
+    } catch(e){ fehler(e); return; }
+    const zeit = setTimeout(() => { worker.terminate(); fehler(new Error("WASM-Zeitüberschreitung")); }, 15000);
+    const offen = new Map();
+    let naechsteId = 1;
+    worker.onerror = e => { clearTimeout(zeit); fehler(e); };
+    worker.onmessage = e => {
+      const d = e.data;
+      if ("bereit" in d){
+        clearTimeout(zeit);
+        if (!d.bereit){ worker.terminate(); fehler(new Error(d.fehler)); return; }
+        SCAN.wasm = {
+          lesen(canvas){
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            const bild = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const id = naechsteId++;
+            return new Promise(antwort => {
+              offen.set(id, antwort);
+              worker.postMessage({ id, data: bild.data.buffer, width: bild.width, height: bild.height }, [bild.data.buffer]);
+            });
+          }
+        };
+        ok();
+        return;
+      }
+      const antwort = offen.get(d.id);
+      if (antwort){ offen.delete(d.id); antwort(d.ok ? d.codes : []); }
+    };
+  }).catch(e => { SCAN.wasmLaedt = null; throw e; });
+  return SCAN.wasmLaedt;
+}
+
+async function findeCodesWasm(canvas){
+  const codes = await SCAN.wasm.lesen(canvas);
+  return codes.map(c => ({
+    text: c.text,
+    punkte: [c.p.topLeft, c.p.topRight, c.p.bottomRight, c.p.bottomLeft].map(p => ({ x: p.x, y: p.y }))
+  }));
+}
+
 async function ladeBarcodeLeser(){
   if (!SCAN.nativ && "BarcodeDetector" in window){
     try {
@@ -1375,10 +1452,11 @@ async function ladeBarcodeLeser(){
     } catch(e){}
   }
   if (SCAN.nativ){
-    ladeZxing().catch(() => {});   /* zweiter Leser im Hintergrund */
+    ladeWasmLeser().catch(() => ladeZxing().catch(() => {}));   /* zweiter Leser im Hintergrund */
     return;
   }
-  await ladeZxing();
+  try { await ladeWasmLeser(); }
+  catch(e){ console.warn("WASM nicht verfügbar, nutze ZXing-JS", e); await ladeZxing(); }
 }
 
 function holeFrame(maxSeite){
@@ -1480,8 +1558,13 @@ async function barcodeSchleife(){
         if (SCAN.nativ){
           try { liste = await findeCodesNativ(v); } catch(e){ SCAN.nativFehler = (SCAN.nativFehler || 0) + 1; }
         }
-        /* Findet der eingebaute Leser nichts, probiert ZXing es auch */
-        if (SCAN.zxing && liste.length === 0) liste = zxingAufVideo(v);
+        /* Sonst der schnelle WASM-Leser im Hintergrund, notfalls ZXing-JS */
+        if (liste.length === 0 && SCAN.wasm){
+          const fr = holeFrame(1600);
+          if (fr) liste = (await findeCodesWasm(fr.canvas)).map(c => ({ text: c.text, punkte: c.punkte.map(p => ({ x: p.x / fr.s, y: p.y / fr.s })) }));
+        } else if (liste.length === 0 && SCAN.zxing){
+          liste = zxingAufVideo(v);
+        }
         const gesehen = new Set();
         liste = liste
           .map(c => ({ text: saeubere(c.text), roh: String(c.text), art: artVonRoh(c.text), zx: !!c.zx, punkte: c.punkte }))
@@ -1492,12 +1575,12 @@ async function barcodeSchleife(){
       }
     } catch(e){ console.warn(e); }
     const ruhig = SCAN.felder.material.wert !== null && SCAN.felder.rolle.wert !== null;
-    await warte(Math.max(30, (ruhig ? 300 : 110) - (performance.now() - start)));
+    await warte(Math.max(SCAN.wasm ? 15 : 30, (ruhig ? 250 : (SCAN.wasm ? 60 : 110)) - (performance.now() - start)));
   }
 }
 
 function zeigeDiagnose(v){
-  const leser = [SCAN.nativ ? "eingebaut" : null, SCAN.zxing ? "ZXing" : null].filter(Boolean).join(" + ") || "lädt";
+  const leser = [SCAN.nativ ? "eingebaut" : null, SCAN.wasm ? "WASM" : null, !SCAN.wasm && SCAN.zxing ? "ZXing-JS" : null].filter(Boolean).join(" + ") || "lädt";
   const teile = [
     "Etikett: " + ({ sartorius: "Sartorius", gore: "Gore" }[SCAN.profil] || "noch unbekannt"),
     "Leser: " + leser,
@@ -1735,7 +1818,36 @@ function regionAusRahmen(qw, qh, drehIndex){
   return { mx: rx + rw / 2, my: ry + rh / 2, w: quer ? rh : rw, h: quer ? rw : rh, winkel };
 }
 
-async function ocrLesen(quelle, qw, qh, region, groesse, leser){
+/* Kantenstärke als Maß für Schärfe (auf verkleinertem Graubild) */
+function schaerfe(c){
+  const w = c.width, h = c.height;
+  const d = c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  let summe = 0, n = 0;
+  for (let y = 2; y < h - 2; y += 2){
+    for (let x = 2; x < w - 2; x += 2){
+      const i = (y * w + x) * 4;
+      const g = d[i] + d[i + 1] + d[i + 2];
+      const gx = d[i + 8] + d[i + 9] + d[i + 10] - g;
+      const gy = d[i + 8 * w] + d[i + 8 * w + 1] + d[i + 8 * w + 2] - g;
+      summe += gx * gx + gy * gy; n++;
+    }
+  }
+  return n ? summe / n : 0;
+}
+
+/* Liefert false, wenn der Ausschnitt deutlich unschärfer ist als zuletzt erreichbar */
+function scharfGenug(c, schluessel){
+  SCAN.schaerfe = SCAN.schaerfe || {};
+  const st = SCAN.schaerfe[schluessel] || (SCAN.schaerfe[schluessel] = { max: 0, aus: 0 });
+  const wert = schaerfe(c);
+  st.max *= 0.97;
+  if (st.max > 0 && wert < st.max * 0.55 && st.aus < 3){ st.aus++; return false; }
+  st.aus = 0;
+  st.max = Math.max(st.max, wert);
+  return true;
+}
+
+async function ocrLesen(quelle, qw, qh, region, groesse, leser, schluessel){
   const sk = Math.min(2.5, 1600 * groesse / Math.max(region.w, region.h));
   const o = document.createElement("canvas");
   o.width = Math.max(1, Math.round(region.w * sk));
@@ -1748,6 +1860,7 @@ async function ocrLesen(quelle, qw, qh, region, groesse, leser){
   x.scale(sk, sk);
   x.rotate(-region.winkel);
   x.drawImage(quelle, -region.mx, -region.my, qw, qh);
+  if (schluessel && !scharfGenug(o, schluessel)) return { uebersprungen: true, text: "" };
   const { data } = await (leser || SCAN.worker).recognize(o, {}, { text: true, blocks: true });
   return data;
 }
@@ -1852,21 +1965,23 @@ function flaecheAusZeile(text){
 async function leseChargeUeberRolle(quelle, qw, qh, dreh, groesse){
   const rc = SCAN.codes.rolle;
   if (!rc || !SCAN.workerC) return null;
-  const data = await ocrLesen(quelle, qw, qh, regionUeberCode(rc, dreh, quelle, qw, qh), groesse, SCAN.workerC);
+  const data = await ocrLesen(quelle, qw, qh, regionUeberCode(rc, dreh, quelle, qw, qh), groesse, SCAN.workerC, SCAN.modus === "live" ? "charge" : null);
+  if (data.uebersprungen) return undefined;
   return chargeAusZeile(data.text);
 }
 
 async function leseFlaecheUnterMaterial(quelle, qw, qh, groesse){
   const mc = SCAN.codes.material;
   if (!mc || !SCAN.workerF) return null;
-  const data = await ocrLesen(quelle, qw, qh, regionUnterCode(mc, quelle, qw, qh), groesse, SCAN.workerF);
+  const data = await ocrLesen(quelle, qw, qh, regionUnterCode(mc, quelle, qw, qh), groesse, SCAN.workerF, SCAN.modus === "live" ? "flaeche" : null);
+  if (data.uebersprungen) return undefined;
   return flaecheAusZeile(data.text);
 }
 
 async function zielCharge(v, vw, vh){
   const dreh = SCAN.nativ ? SCAN.zielDreh : 0;
   const c = await leseChargeUeberRolle(v, vw, vh, dreh, 0.3);
-  if (!SCAN.aktiv) return;
+  if (!SCAN.aktiv || c === undefined) return;   /* unscharf übersprungen */
   if (c){
     SCAN.zielFehl.charge = 0;
     SCAN.zuletztCharge = c;
@@ -1880,7 +1995,7 @@ async function zielCharge(v, vw, vh){
 async function zielFlaeche(v, vw, vh){
   const F = SCAN.felder;
   const fl = await leseFlaecheUnterMaterial(v, vw, vh, 0.2);
-  if (!SCAN.aktiv) return;
+  if (!SCAN.aktiv || fl === undefined) return;   /* unscharf übersprungen */
   if (fl !== null && !SCAN.flaecheManuell && F.flaeche.wert === null){
     SCAN.zielFehl.flaeche = 0;
     SCAN.zuletztFlaeche = fmt(fl);
@@ -1911,8 +2026,8 @@ async function ocrVersuch(){
     jobs.push((async () => {
       const codes = frischeCodes();
       const region = codes.length ? regionAusCodes(codes, SCAN.ocrDreh) : regionAusRahmen(vw, vh, SCAN.rahmenDreh);
-      const data = await ocrLesen(v, vw, vh, region, 0.65);
-      if (!SCAN.aktiv) return;
+      const data = await ocrLesen(v, vw, vh, region, 0.65, null, "etikett");
+      if (!SCAN.aktiv || data.uebersprungen) return;
       if (!uebernehmeOcr(data)){
         if (codes.length) SCAN.ocrDreh = SCAN.ocrDreh ? 0 : 1;
         else SCAN.rahmenDreh = (SCAN.rahmenDreh + 1) % 4;
@@ -2054,7 +2169,7 @@ async function fotoAuswerten(datei){
 
   /* 1. Barcodes suchen, bei Bedarf in mehreren Größen */
   try { await ladeBarcodeLeser(); } catch(e){}
-  try { await ladeZxing(); } catch(e){}
+  if (!SCAN.wasm) { try { await ladeZxing(); } catch(e){} }
   const liste = [];
   const dazu = (l, s) => l.forEach(c => {
     const t = saeubere(c.text);
@@ -2069,6 +2184,7 @@ async function fotoAuswerten(datei){
     try {
       let s = zeichneBild(img, groesse);
       if (SCAN.nativ){ try { dazu(await findeCodesNativ(SCAN.frame), s); } catch(e){} }
+      if (SCAN.wasm && !beide()){ try { s = zeichneBild(img, groesse); dazu(await findeCodesWasm(SCAN.frame), s); } catch(e){} }
       if (SCAN.zxing && !beide()){
         s = zeichneBild(img, groesse);
         dazu(findeCodesZxing(SCAN.frame, false), s);
@@ -2245,6 +2361,10 @@ function aktualisierePanel(){
   else if (!feldOk(F.charge)) setzeStatus("Charge wird gelesen: Barcode unter der Charge ins Bild, ruhig halten");
   else setzeStatus(SCAN.ocrFehler ? "Fläche bitte eingeben" : "Fläche wird gelesen, Etikett ruhig halten");
 
+  if (komplett) pruefeAutoSpeichern();
+  if (komplett && SCAN.modus === "live" && $("autoSpeichern").checked && SCAN.letzterSchluessel === scanSchluessel()){
+    $("scanHinweis").textContent = "Diese Rolle wurde gerade gespeichert. Zum erneuten Speichern auf „Speichern“ tippen.";
+  }
   if (komplett && !SCAN.fertigGemeldet){
     SCAN.fertigGemeldet = true;
     if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
@@ -2273,23 +2393,77 @@ $("scanFlaeche").addEventListener("input", ev => {
   aktualisierePanel();
 });
 
-$("btnScanSpeichern").addEventListener("click", () => {
+const KEY_AUTO = "inventur_autoSpeichern";
+try { $("autoSpeichern").checked = localStorage.getItem(KEY_AUTO) !== "0"; } catch(e){ $("autoSpeichern").checked = true; }
+$("autoSpeichern").addEventListener("change", ev => {
+  try { localStorage.setItem(KEY_AUTO, ev.target.checked ? "1" : "0"); } catch(e){}
+  aktualisierePanel();
+});
+
+let aktionTimer;
+function zeigeAktion(text, knopf, aktion){
+  $("aktionText").textContent = text;
+  $("aktionKnopf").textContent = knopf;
+  $("aktionKnopf").onclick = () => { $("aktionMeldung").classList.remove("zeigen"); aktion(); };
+  $("aktionMeldung").classList.add("zeigen");
+  clearTimeout(aktionTimer);
+  aktionTimer = setTimeout(() => $("aktionMeldung").classList.remove("zeigen"), 6000);
+}
+
+function scanSchluessel(){
+  const F = SCAN.felder;
+  return [feldWert(F.material), feldWert(F.charge), flaecheWert(), feldWert(F.rolle)].map(x => x === null ? "" : String(x)).join("|");
+}
+
+function speichereScan(automatisch){
   const F = SCAN.felder;
   const menge = flaecheWert();
-  if ($("btnScanSpeichern").disabled || feldWert(F.material) === null || feldWert(F.charge) === null || menge === null) return;
+  if (feldWert(F.material) === null || feldWert(F.charge) === null || menge === null) return false;
   const typ = angleichen("typ", feldWert(F.material));
   const charge = angleichen("charge", feldWert(F.charge));
   const rolle = feldWert(F.rolle);
-  if (rolle && inventur.some(e => e.rolle === rolle) &&
-      !confirm("Die Rolle " + rolle + " ist schon erfasst. Trotzdem noch einmal speichern?")) return;
+  if (rolle && inventur.some(e => e.rolle === rolle)){
+    if (automatisch) return false;
+    if (!confirm("Die Rolle " + rolle + " ist schon erfasst. Trotzdem noch einmal speichern?")) return false;
+  }
   const eintrag = { id: neueId(), typ, charge, menge, zeit: Date.now() };
   if (rolle) eintrag.rolle = rolle;
   inventur.push(eintrag);
   speichern();
   renderAlles();
-  toast("Gespeichert: " + fmt(menge) + " m², Charge " + charge);
+  SCAN.letzterSchluessel = scanSchluessel();
+  if (navigator.vibrate) navigator.vibrate(automatisch ? [40, 30, 40, 30, 120] : 60);
+  zeigeAktion((automatisch ? "Automatisch gespeichert: " : "Gespeichert: ") + fmt(menge) + " m², Charge " + charge, "Rückgängig", () => {
+    inventur = inventur.filter(e => e.id !== eintrag.id);
+    speichern();
+    renderAlles();
+    SCAN.letzterSchluessel = null;
+    toast("Rückgängig gemacht");
+  });
   scanZuruecksetzen();
-  if (SCAN.modus === "foto") $("fotoKamera").click();
+  return true;
+}
+
+/* Wird aufgerufen, sobald alle drei Felder grün sind */
+function pruefeAutoSpeichern(){
+  if (SCAN.modus !== "live" || !$("autoSpeichern").checked || SCAN.autoTimer) return;
+  /* Dieselbe Rolle wie gerade gespeichert, noch im Bild: nicht noch einmal */
+  if (SCAN.letzterSchluessel && SCAN.letzterSchluessel === scanSchluessel()) return;
+  const rolle = feldWert(SCAN.felder.rolle);
+  if (rolle && inventur.some(e => e.rolle === rolle)) return;
+  SCAN.autoTimer = setTimeout(() => {
+    SCAN.autoTimer = null;
+    if (!SCAN.aktiv) return;
+    const F = SCAN.felder;
+    const komplett = feldOk(F.material) && feldOk(F.charge) && (SCAN.flaecheManuell ? flaecheWert() !== null : F.flaeche.wert !== null);
+    if (komplett) speichereScan(true);
+  }, 700);
+}
+
+$("btnScanSpeichern").addEventListener("click", () => {
+  if ($("btnScanSpeichern").disabled) return;
+  clearTimeout(SCAN.autoTimer); SCAN.autoTimer = null;
+  if (speichereScan(false) && SCAN.modus === "foto") $("fotoKamera").click();
 });
 
 $("btnScanFormular").addEventListener("click", () => {
