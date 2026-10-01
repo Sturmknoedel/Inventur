@@ -296,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v23</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v24</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -1655,7 +1655,10 @@ function paareSartorius(liste, vw, vh){
   const mats = liste.filter(c => c.art === "material");
   const rollen = liste.filter(c => c.art === "rolle");
   if (!rollen.length) return;
-  if (!mats.length){ rollen.forEach(r => r.art = null); return; }
+  if (!mats.length){
+    if (rollen.length > 1) rollen.forEach(r => r.art = null);
+    return;
+  }
   const abstand = c => { const m = mitte(c.punkte); return Math.hypot(m.x - vw / 2, m.y - vh / 2); };
   let bestes = null;
   mats.forEach(mc => {
@@ -2399,7 +2402,10 @@ function aktualisierePanel(){
   let hinweis = "";
   if (SCAN.ocrFehler && !SCAN.flaecheManuell) hinweis = "Texterkennung nicht verfügbar. Fläche bitte von Hand eingeben.";
   if (foto && speicherbar && !komplett) hinweis = "Gelb markierte Werte bitte kurz mit dem Etikett vergleichen.";
-  if (speicherbar && !(rolle && F.rolle.wert !== null)){
+  if (speicherbar && hatRollenNr() && F.rolle.wert === null){
+    hinweis = rollenNrName() + " noch nicht gelesen: kurz den Barcode " + (SCAN.profil === "gore" ? "der Serial Lot Number" : "unter der Charge") + " ins Bild halten.";
+  }
+  if (speicherbar && !hatRollenNr()){
     const doppelt = inventur.some(e =>
       schluessel(e.typ) === schluessel(feldWert(F.material)) &&
       schluessel(e.charge) === schluessel(feldWert(F.charge)) &&
