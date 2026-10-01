@@ -296,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v19</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v20</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -1236,6 +1236,7 @@ async function oeffneScanner(){
 
 function schliesseScanner(){
   SCAN.aktiv = false;
+  SCAN.pause = null;
   stoppeKamera();
   $("scanFoto").hidden = true;
   $("scanFoto").removeAttribute("src");
@@ -1639,12 +1640,37 @@ function ordneGore(liste){
   }
 }
 
+function beendePause(){
+  SCAN.pause = null;
+}
+
+/* true = Bild ignorieren, weil noch das eben gespeicherte Etikett zu sehen ist */
+function inPause(liste){
+  const P = SCAN.pause;
+  if (!P) return false;
+  const jetzt = Date.now();
+  if (!liste.length){
+    P.leerSeit = P.leerSeit || jetzt;
+    if (jetzt - P.leerSeit >= 1000){ beendePause(); return false; }
+    return true;
+  }
+  P.leerSeit = null;
+  const rolle = liste.find(c => c.art === "rolle");
+  const mat = liste.find(c => c.art === "material");
+  const andereRolle = rolle && P.rolle && rolle.text !== P.rolle;
+  const gleicheRolle = rolle && P.rolle && rolle.text === P.rolle;
+  const anderesMaterial = mat && schluessel(mat.text) !== schluessel(P.material);
+  if (andereRolle || (anderesMaterial && !gleicheRolle)){ beendePause(); return false; }
+  return true;
+}
+
 function verarbeiteCodes(liste, vw, vh){
   const jetzt = Date.now();
   liste.forEach(c => { if (c.art === undefined) c.art = artVonRoh(c.roh !== undefined ? c.roh : c.text); });
   if (liste.some(c => /^[&%]/.test(String(c.roh !== undefined ? c.roh : c.text).trim()))) setzeProfil("sartorius");
   else if (liste.some(c => !c.art && (/^\d{10}$/.test(c.text) || /^\d{1,4}[.,]\d{1,3}$/.test(c.text)))) setzeProfil("gore");
   if (SCAN.profil === "gore") ordneGore(liste);
+  if (inPause(liste)){ leereOverlay(); aktualisierePanel(); return; }
 
   const beste = {};
   liste.forEach(c => {
@@ -1777,7 +1803,7 @@ function felderOffen(){
 
 async function ocrSchleife(){
   while (SCAN.aktiv){
-    if ((SCAN.worker || SCAN.workerC) && felderOffen() && SCAN.profil !== "gore"){
+    if ((SCAN.worker || SCAN.workerC) && felderOffen() && SCAN.profil !== "gore" && !SCAN.pause){
       try { await ocrVersuch(); } catch(e){ console.warn(e); }
     }
     await warte(30);
@@ -2345,6 +2371,10 @@ function aktualisierePanel(){
   $("scanHinweis").textContent = hinweis;
 
   if (!SCAN.aktiv) return;
+  if (SCAN.pause && !foto){
+    setzeStatus("Gespeichert. Nächstes Etikett ins Bild halten");
+    return;
+  }
   if (foto){
     if (SCAN.fotoLaeuft) setzeStatus("Foto wird ausgewertet …");
     else if (!SCAN.fotoUrl) {}
@@ -2362,8 +2392,9 @@ function aktualisierePanel(){
   else setzeStatus(SCAN.ocrFehler ? "Fläche bitte eingeben" : "Fläche wird gelesen, Etikett ruhig halten");
 
   if (komplett) pruefeAutoSpeichern();
-  if (komplett && SCAN.modus === "live" && $("autoSpeichern").checked && SCAN.letzterSchluessel === scanSchluessel()){
-    $("scanHinweis").textContent = "Diese Rolle wurde gerade gespeichert. Zum erneuten Speichern auf „Speichern“ tippen.";
+  if (komplett && SCAN.modus === "live" && $("autoSpeichern").checked){
+    const grund = autoSperre();
+    if (grund) $("scanHinweis").textContent = grund;
   }
   if (komplett && !SCAN.fertigGemeldet){
     SCAN.fertigGemeldet = true;
@@ -2380,7 +2411,7 @@ $("btnScannen").addEventListener("click", oeffneScanner);
 $("btnScanZu").addEventListener("click", schliesseScanner);
 $("btnScanNeu").addEventListener("click", () => {
   if (SCAN.modus === "foto") $("fotoKamera").click();
-  else scanZuruecksetzen();
+  else { beendePause(); SCAN.letzterSchluessel = null; scanZuruecksetzen(); }
 });
 
 $("scanFlaeche").addEventListener("input", ev => {
@@ -2412,7 +2443,7 @@ function zeigeAktion(text, knopf, aktion){
 
 function scanSchluessel(){
   const F = SCAN.felder;
-  return [feldWert(F.material), feldWert(F.charge), flaecheWert(), feldWert(F.rolle)].map(x => x === null ? "" : String(x)).join("|");
+  return [feldWert(F.material), feldWert(F.charge), flaecheWert()].map(x => x === null ? "" : schluessel(String(x))).join("|");
 }
 
 function speichereScan(automatisch){
@@ -2432,12 +2463,14 @@ function speichereScan(automatisch){
   speichern();
   renderAlles();
   SCAN.letzterSchluessel = scanSchluessel();
+  if (SCAN.modus === "live") SCAN.pause = { material: typ, rolle: rolle || null, leerSeit: null };
   if (navigator.vibrate) navigator.vibrate(automatisch ? [40, 30, 40, 30, 120] : 60);
   zeigeAktion((automatisch ? "Automatisch gespeichert: " : "Gespeichert: ") + fmt(menge) + " m², Charge " + charge, "Rückgängig", () => {
     inventur = inventur.filter(e => e.id !== eintrag.id);
     speichern();
     renderAlles();
     SCAN.letzterSchluessel = null;
+    beendePause();
     toast("Rückgängig gemacht");
   });
   scanZuruecksetzen();
@@ -2445,15 +2478,38 @@ function speichereScan(automatisch){
 }
 
 /* Wird aufgerufen, sobald alle drei Felder grün sind */
-function pruefeAutoSpeichern(){
-  if (SCAN.modus !== "live" || !$("autoSpeichern").checked || SCAN.autoTimer) return;
-  /* Dieselbe Rolle wie gerade gespeichert, noch im Bild: nicht noch einmal */
-  if (SCAN.letzterSchluessel && SCAN.letzterSchluessel === scanSchluessel()) return;
+/* Sartorius und Gore haben eine eindeutige Nummer pro Rolle */
+function hatRollenNr(){ return SCAN.profil === "sartorius" || SCAN.profil === "gore"; }
+function rollenNrName(){ return SCAN.profil === "gore" ? "Serial Lot Number" : "HF-Rollen-Nr."; }
+
+function gleicheWerteErfasst(){
+  const F = SCAN.felder;
+  const fl = flaecheWert();
+  return inventur.some(e =>
+    schluessel(e.typ) === schluessel(feldWert(F.material) || "") &&
+    schluessel(e.charge) === schluessel(feldWert(F.charge) || "") &&
+    fl !== null && Math.abs(e.menge - fl) < 0.0005);
+}
+
+/* Grund, warum gerade nicht automatisch gespeichert wird (oder leer) */
+function autoSperre(){
   const rolle = feldWert(SCAN.felder.rolle);
-  if (rolle && inventur.some(e => e.rolle === rolle)) return;
+  if (SCAN.letzterSchluessel && SCAN.letzterSchluessel === scanSchluessel()) return "Diese Rolle wurde gerade gespeichert. Zum erneuten Speichern auf „Speichern“ tippen.";
+  if (hatRollenNr()){
+    if (SCAN.felder.rolle.wert === null) return "Warte noch auf die " + rollenNrName() + " … oder auf „Speichern“ tippen.";
+    if (inventur.some(e => e.rolle === rolle)) return "Achtung: Die Rolle " + rolle + " ist schon erfasst.";
+  } else if (gleicheWerteErfasst()){
+    return "Eine Rolle mit genau diesen Werten ist schon erfasst. Zum Speichern auf „Speichern“ tippen.";
+  }
+  return "";
+}
+
+function pruefeAutoSpeichern(){
+  if (SCAN.modus !== "live" || !$("autoSpeichern").checked || SCAN.autoTimer || SCAN.pause) return;
+  if (autoSperre()) return;
   SCAN.autoTimer = setTimeout(() => {
     SCAN.autoTimer = null;
-    if (!SCAN.aktiv) return;
+    if (!SCAN.aktiv || SCAN.pause || autoSperre()) return;
     const F = SCAN.felder;
     const komplett = feldOk(F.material) && feldOk(F.charge) && (SCAN.flaecheManuell ? flaecheWert() !== null : F.flaeche.wert !== null);
     if (komplett) speichereScan(true);
