@@ -296,7 +296,7 @@ h2{font-family:var(--cond);font-size:26px;font-weight:700;margin:2px 0 14px;line
 <body>
 
 <header class="kopf">
-  <h1><span class="marke">Sartorius <small id="version">v24</small></span>Filter Inventur</h1>
+  <h1><span class="marke">Sartorius <small id="version">v25</small></span>Filter Inventur</h1>
   <div class="summe" aria-live="polite">
     <b id="kopfSumme">0,000 m²</b>
     <small id="kopfAnzahl">0 Positionen</small>
@@ -1712,7 +1712,7 @@ function verarbeiteCodes(liste, vw, vh){
   else if (liste.some(c => !c.art && (/^\d{10}$/.test(c.text) || /^\d{1,4}[.,]\d{1,3}$/.test(c.text)))) setzeProfil("gore");
   if (SCAN.profil === "gore") ordneGore(liste);
   if (SCAN.profil === "sartorius") paareSartorius(liste, vw, vh);
-  if (inPause(liste)){ leereOverlay(); aktualisierePanel(); return; }
+  if (inPause(liste) || Date.now() < (SCAN.sperreBis || 0)){ leereOverlay(); aktualisierePanel(); return; }
 
   const beste = {};
   liste.forEach(c => {
@@ -1845,7 +1845,7 @@ function felderOffen(){
 
 async function ocrSchleife(){
   while (SCAN.aktiv){
-    if ((SCAN.worker || SCAN.workerC) && felderOffen() && SCAN.profil !== "gore" && !SCAN.pause){
+    if ((SCAN.worker || SCAN.workerC) && felderOffen() && SCAN.profil !== "gore" && !SCAN.pause && Date.now() >= (SCAN.sperreBis || 0)){
       try { await ocrVersuch(); } catch(e){ console.warn(e); }
     }
     await warte(30);
@@ -2062,12 +2062,12 @@ async function zielCharge(v, vw, vh){
 
 async function zielFlaeche(v, vw, vh){
   const F = SCAN.felder;
-  const fl = await leseFlaecheUnterMaterial(v, vw, vh, 0.2);
+  const fl = await leseFlaecheUnterMaterial(v, vw, vh, 0.35);
   if (!SCAN.aktiv || fl === undefined) return;   /* unscharf übersprungen */
   if (fl !== null && !SCAN.flaecheManuell && F.flaeche.wert === null){
     SCAN.zielFehl.flaeche = 0;
     SCAN.zuletztFlaeche = fmt(fl);
-    if (beobachte("flaeche", fl, "ziel", 2) && navigator.vibrate) navigator.vibrate(30);
+    if (beobachte("flaeche", fl, "ziel", 3) && navigator.vibrate) navigator.vibrate(30);
     $("scanFlaeche").value = fmt(F.flaeche.wert !== null ? F.flaeche.wert : F.flaeche.kandidat);
   } else {
     SCAN.zielFehl.flaeche++;
@@ -2418,7 +2418,7 @@ function aktualisierePanel(){
   $("scanHinweis").textContent = hinweis;
 
   if (!SCAN.aktiv) return;
-  if (SCAN.pause && !foto){
+  if ((SCAN.pause || Date.now() < (SCAN.sperreBis || 0)) && !foto){
     setzeStatus("Gespeichert. Nächstes Etikett ins Bild halten");
     return;
   }
@@ -2455,7 +2455,7 @@ $("btnScannen").addEventListener("click", oeffneScanner);
 $("btnScanZu").addEventListener("click", schliesseScanner);
 $("btnScanNeu").addEventListener("click", () => {
   if (SCAN.modus === "foto") $("fotoKamera").click();
-  else { beendePause(); SCAN.letzterSchluessel = null; scanZuruecksetzen(); }
+  else { beendePause(); SCAN.sperreBis = 0; SCAN.letzterSchluessel = null; scanZuruecksetzen(); }
 });
 
 $("scanFlaeche").addEventListener("input", ev => {
@@ -2503,6 +2503,7 @@ function speichereScan(automatisch){
   speichern();
   renderAlles();
   SCAN.letzterSchluessel = scanSchluessel();
+  if (SCAN.modus === "live") SCAN.sperreBis = Date.now() + 1000;
 
   if (navigator.vibrate) navigator.vibrate(automatisch ? [40, 30, 40, 30, 120] : 60);
   zeigeAktion("Gespeichert: " + fmt(menge) + " m², Charge " + charge, "Rückgängig", () => {
